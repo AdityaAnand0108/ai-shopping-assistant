@@ -26,3 +26,11 @@ data/
 ### Frontend (phase 9) ###
 node_modules/
 dist/
+
+### Nested git repositories ###
+# Shop-assist is its own repository. Committing it here would store only a
+# gitlink - a bare commit id with no way to fetch it - so clones of this repo
+# would get an empty directory. If it is meant to be part of this project it
+# should be a plain directory (delete its .git), and if it is meant to be
+# separate it belongs outside this tree.
+Shop-assist/
