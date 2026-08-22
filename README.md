@@ -14,15 +14,15 @@ Runs entirely on free, local tooling. No paid APIs, no cloud infrastructure.
 
 ## Status
 
-Built phase by phase. Current: **Phase 2 — authentication complete.**
+Built phase by phase. Current: **Phase 3 — the backend works end to end with no AI.**
 
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 0 | Project scaffold, build, config profiles | ✅ Done |
 | 1 | Domain model, migrations, CSV seed data | ✅ Done |
 | 2 | Auth: signup, login, BCrypt, JWT security chain | ✅ Done |
-| 3 | Deterministic REST API, scoped to the signed-in user | ⬜ Next |
-| 4 | Ollama + Spring AI wiring, plain chat | ⬜ |
+| 3 | Deterministic REST API, scoped to the signed-in user | ✅ Done |
+| 4 | Ollama + Spring AI wiring, plain chat | ⬜ Next |
 | 5 | Tool calling (search, orders, draft→confirm purchase) | ⬜ |
 | 6 | RAG over the product catalog | ⬜ |
 | 7 | Guardrails and scope enforcement | ⬜ |
@@ -131,6 +131,62 @@ SHOPASSIST_JWT_SECRET="a-long-random-secret-of-at-least-32-bytes"
   why. Login itself gives nothing away; these two paths are a deliberate trade of
   a little enumeration exposure for a usable product.
 - **No refresh token.** A 60-minute session ends with a fresh sign-in.
+
+## Catalog and order API
+
+Everything the assistant will later do through tool calls is already available
+here as plain REST, and works with no AI running. That ordering is deliberate:
+when the assistant eventually says something wrong, these endpoints tell you
+immediately whether the data layer or the model is at fault.
+
+### Catalog — public
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/api/products` | Search with filters, sorting and paging |
+| `GET` | `/api/products/filters` | Brands and categories available to filter on |
+| `GET` | `/api/products/{sku}` | One product in full |
+
+Search parameters: `q`, `brand`, `category`, `minPrice`, `maxPrice`,
+`inStockOnly`, `sort` (`RELEVANCE`, `PRICE`, `RATING`, `NAME`), `direction`
+(`ASC`/`DESC`), `page`, `size`.
+
+The brief's own example question, answered with no account:
+
+```bash
+curl -s "http://localhost:8080/api/products?q=t-shirt&brand=Nike&inStockOnly=true"
+```
+
+### Orders — requires a token
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/api/orders` | Your orders, newest first |
+| `GET` | `/api/orders/{orderNumber}` | One of your orders, with lines and timeline |
+| `GET` | `/api/orders/{orderNumber}/timeline` | Just the tracking timeline |
+
+No path carries a user identifier. Whose orders these are comes from the token,
+so there is no URL to edit to reach somebody else's.
+
+### What these endpoints will not tell you
+
+- **Stock levels.** Availability is published as `IN_STOCK`, `LOW_STOCK` or
+  `OUT_OF_STOCK`, never the count. Inventory is commercially sensitive and no
+  shopper needs the figure, so the API cannot be scraped to reconstruct it.
+  Phase 5's `checkStock` tool likewise answers yes or no.
+- **Whether an order number is real.** An order belonging to another shopper and
+  an order that was never issued return byte-identical 404s. If they differed,
+  the order-number space could be walked to find live numbers.
+- **Anything about the schema.** Responses are whitelisted records, not
+  serialised entities, so primary keys, foreign keys, audit timestamps and stock
+  counts cannot start appearing because a column was added later. Errors leave
+  through one handler as RFC 7807 documents, so no stack trace, SQL fragment or
+  Java type name reaches a client.
+- **More than 50 products at a time.** Page size is capped server-side.
+- **Results ordered by an arbitrary column.** `sort` is an allowlist of four
+  named orderings. A free-text sort parameter would let a caller order by
+  `stockQuantity` and read inventory back out of the ordering. Each ordering
+  appends SKU as a tiebreak, so paging cannot repeat or skip a row.
 
 The default `dev` profile runs H2 in **MySQL compatibility mode**, so a single set
 of Flyway migrations works against both H2 and a real MySQL server. This keeps a

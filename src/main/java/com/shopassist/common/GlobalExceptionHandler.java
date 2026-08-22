@@ -3,9 +3,12 @@ package com.shopassist.common;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
-import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.BindException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.net.URI;
 import java.time.Instant;
@@ -27,8 +30,12 @@ public class GlobalExceptionHandler {
 
     private static final String PROBLEM_BASE = "https://shop-assistant.local/problems/";
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
+    /**
+     * Covers both request bodies and query parameters: the body case throws
+     * MethodArgumentNotValidException, which extends BindException.
+     */
+    @ExceptionHandler(BindException.class)
+    public ProblemDetail handleValidation(BindException ex) {
         Map<String, String> errors = new LinkedHashMap<>();
         ex.getBindingResult().getFieldErrors()
                 .forEach(error -> errors.putIfAbsent(error.getField(), error.getDefaultMessage()));
@@ -37,6 +44,43 @@ public class GlobalExceptionHandler {
                 "One or more fields were rejected.", "validation");
         problem.setProperty("errors", errors);
         return problem;
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ProblemDetail handleNotFound(ResourceNotFoundException ex) {
+        // Identical whether the resource is missing or simply not the caller's.
+        return problem(HttpStatus.NOT_FOUND, "Not found", ex.getMessage(), "not-found");
+    }
+
+    @ExceptionHandler(InvalidRequestException.class)
+    public ProblemDetail handleInvalidRequest(InvalidRequestException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Invalid request", ex.getMessage(), "invalid-request");
+    }
+
+    /**
+     * A query parameter that cannot be converted — a non-numeric price, or a
+     * sort key outside the allowlist. The parameter name is safe to echo since
+     * the client sent it; the offending value and the target type are not, as
+     * the type would name an internal class.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Invalid request",
+                "The value supplied for '" + ex.getName() + "' is not valid.", "invalid-request");
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ProblemDetail handleMissingParameter(MissingServletRequestParameterException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Invalid request",
+                "Required parameter '" + ex.getParameterName() + "' is missing.", "invalid-request");
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleUnreadableBody(HttpMessageNotReadableException ex) {
+        // Jackson's message quotes the offending JSON and names the target class;
+        // neither belongs in a response.
+        return problem(HttpStatus.BAD_REQUEST, "Invalid request",
+                "The request body could not be read as JSON.", "invalid-request");
     }
 
     @ExceptionHandler(AuthenticationFailedException.class)
