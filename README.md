@@ -273,6 +273,47 @@ ids, so any answer can be traced back to what produced it.
   request fails at commit time after the assistant has already composed a good
   reply. This was a real bug, found by asking one shopper about another's order.
 
+## Documentation conventions
+
+Comments explain **why**, never **what**. The code already says what it does;
+a comment that restates it is a second thing to keep in sync and the first
+thing to rot.
+
+Concretely, a comment here earns its place when it records one of:
+
+- a decision and the alternative rejected (`OrderRepository` has no
+  `findByOrderNumber(String)`, and the Javadoc says why);
+- a constraint that is not visible locally (BCrypt ignoring input past 72 bytes,
+  `USER` being reserved in MySQL and H2);
+- a measurement (the 0.55 similarity threshold, with the scores behind it);
+- a failure mode being defended against (holding a transaction across a model
+  call, a stale index surfacing an old price).
+
+What is deliberately **not** documented: accessors, `from()` mappers, and other
+members whose signature is the whole story. 94 public methods carry no Javadoc,
+and that is the intended state — `ProductSummaryResponse.from(Product)` gains
+nothing from a sentence repeating its own name.
+
+Every package carries a `package-info.java` giving architectural orientation:
+what the package is for, and which invariants hold across it.
+
+### Enforcement
+
+```bash
+./mvnw clean verify
+```
+
+`maven-javadoc-plugin` runs with `doclint=all,-missing` and
+`failOnWarnings=true`, so the build fails on malformed HTML, a `@param` that
+does not match the signature, or an `{@link}` pointing at something that no
+longer exists — the ways documentation quietly turns into lies. `-missing` is
+excluded on purpose: requiring a comment on every element is what produces
+`@param sku the sku`.
+
+The `clean` matters. `javadoc:javadoc` on its own skips regeneration when its
+output looks newer than the sources, and will report success without having
+checked anything.
+
 ## Semantic search
 
 Catalog search is hybrid: retrieval decides which products a phrase is *about*,

@@ -6,6 +6,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Chat turns.
+ *
+ * <p>Reads are always bounded. A thread grows without limit, and replaying an
+ * unbounded one to the model would overflow its context window — a failure that
+ * arrives as a quietly worse answer rather than an error.
+ */
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
     List<ChatMessage> findByConversationIdOrderByCreatedAtAsc(Long conversationId);

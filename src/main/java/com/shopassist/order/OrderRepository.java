@@ -6,6 +6,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Orders, always scoped to their owner.
+ *
+ * <p>There is deliberately no {@code findByOrderNumber(String)}. Every lookup
+ * takes the owner id too, so the ownership check cannot be forgotten at a call
+ * site — including by a tool the language model invokes. The guarantee holds
+ * because no method exists to express anything weaker.
+ */
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
     /**

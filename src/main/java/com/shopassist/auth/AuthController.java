@@ -11,6 +11,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Registration and sign-in endpoints.
+ *
+ * <p>Signup and login are the only unauthenticated POST routes in the
+ * application. The {@code @Operation} summaries below document the API for its
+ * consumers; the rules that make these endpoints safe to expose — uniform
+ * failures, lockout, hashing — live in {@link AuthService}.
+ */
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = "Authentication", description = "Registration and sign-in")

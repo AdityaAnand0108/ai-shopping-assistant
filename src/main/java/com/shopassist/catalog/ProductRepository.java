@@ -11,6 +11,15 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Catalog queries.
+ *
+ * <p>Two query methods rather than one because search has two shapes. The
+ * keyword path filters and pages in SQL. The hybrid path takes a set of SKUs
+ * that semantic retrieval proposed and applies the same hard filters to them,
+ * because price, brand and stock are facts rather than similarities and an
+ * embedding knows nothing about any of them.
+ */
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findBySkuIgnoreCase(String sku);

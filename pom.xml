@@ -164,6 +164,38 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+            <!--
+                Keeps Javadoc honest rather than aspirational. doclint checks
+                that every comment is well-formed HTML, that @param and @return
+                match the signature they describe, and that no {@link} points at
+                something that no longer exists — the failure mode where docs
+                quietly rot into lies. Bound to `verify` rather than `test` so
+                the ordinary build stays fast.
+
+                'missing' is deliberately excluded. With it on, every record
+                component needs an @param, which on a response DTO means lines
+                like "@param sku the sku" - restating the name rather than
+                explaining anything. The bar here is that documentation is
+                CORRECT where it exists, not that it exists everywhere.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <doclint>all,-missing</doclint>
+                    <failOnWarnings>true</failOnWarnings>
+                    <quiet>true</quiet>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>check-javadoc</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>javadoc</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

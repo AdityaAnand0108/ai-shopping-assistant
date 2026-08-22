@@ -15,7 +15,10 @@ public record AssistantExchange(
         String userMessage
 ) {
     /**
+     * One earlier turn being replayed as context.
+     *
      * @param fromShopper true for a shopper turn, false for an assistant turn
+     * @param content     what was said
      */
     public record HistoryTurn(boolean fromShopper, String content) {
     }
