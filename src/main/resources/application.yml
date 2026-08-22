@@ -76,8 +76,18 @@ shopassist:
     products-csv: classpath:data/products.csv
     demo-password: Password123
   rag:
+    enabled: true
     store-path: ./data/vector-store.json
-    top-k: 6
+    # Retrieval runs before the hard filters, so it must return enough
+    # candidates that a price or stock filter still leaves results behind.
+    top-k: 40
+    # Measured, not guessed. With nomic-embed-text over short product
+    # descriptions, cosine scores sit in a narrow band: a strong match reaches
+    # about 0.60 and an unrelated item still scores about 0.45, so ranking in
+    # the middle is close to arbitrary. Cutting at 0.55 keeps the confident head
+    # of the ranking and discards the rest, which then falls through to keyword
+    # search. Returning nothing is better than returning chinos for "tea and
+    # coffee".
     similarity-threshold: 0.55
   guard:
     max-input-chars: 1000

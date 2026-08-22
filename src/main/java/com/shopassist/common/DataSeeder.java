@@ -3,6 +3,7 @@ package com.shopassist.common;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Component;
  * installer themselves, inside a transaction that rolls back.
  */
 @Component
+@Order(10)
 @Slf4j
 public class DataSeeder implements ApplicationRunner {
 

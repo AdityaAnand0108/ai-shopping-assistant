@@ -12,3 +12,8 @@ spring:
 shopassist:
   seed:
     enabled: false
+
+# Retrieval needs a live embedding model. Tests exercise the hybrid search path
+# through a stub retriever instead, so the suite never depends on Ollama.
+  rag:
+    enabled: false

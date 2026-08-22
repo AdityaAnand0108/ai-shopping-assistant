@@ -48,4 +48,28 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                          @Param("maxPrice") BigDecimal maxPrice,
                          @Param("inStockOnly") boolean inStockOnly,
                          Pageable pageable);
+
+    /**
+     * The same hard filters, restricted to a set of SKUs.
+     *
+     * <p>Used by the hybrid path: retrieval proposes candidates, and this
+     * decides which of them a shopper may actually be shown. Price, brand and
+     * stock stay in SQL because they are facts, not similarities — an embedding
+     * has no idea what something costs.
+     */
+    @Query("""
+            SELECT p FROM Product p
+            WHERE UPPER(p.sku) IN :skus
+              AND (:brand IS NULL OR LOWER(p.brand) = LOWER(:brand))
+              AND (:category IS NULL OR LOWER(p.category) = LOWER(:category))
+              AND (:minPrice IS NULL OR p.price >= :minPrice)
+              AND (:maxPrice IS NULL OR p.price <= :maxPrice)
+              AND (:inStockOnly = FALSE OR p.stockQuantity > 0)
+            """)
+    List<Product> findBySkusWithFilters(@Param("skus") Collection<String> skus,
+                                        @Param("brand") String brand,
+                                        @Param("category") String category,
+                                        @Param("minPrice") BigDecimal minPrice,
+                                        @Param("maxPrice") BigDecimal maxPrice,
+                                        @Param("inStockOnly") boolean inStockOnly);
 }

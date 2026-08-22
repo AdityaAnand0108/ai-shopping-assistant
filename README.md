@@ -14,7 +14,7 @@ Runs entirely on free, local tooling. No paid APIs, no cloud infrastructure.
 
 ## Status
 
-Built phase by phase. Current: **Phase 5 — the assistant answers from the database, via tools.**
+Built phase by phase. Current: **Phase 6 — search understands intent, not just keywords.**
 
 | Phase | Scope | Status |
 |-------|-------|--------|
@@ -24,8 +24,8 @@ Built phase by phase. Current: **Phase 5 — the assistant answers from the data
 | 3 | Deterministic REST API, scoped to the signed-in user | ✅ Done |
 | 4 | Ollama + Spring AI wiring, conversational chat | ✅ Done |
 | 5 | Tool calling (search, orders, draft→confirm purchase) | ✅ Done |
-| 6 | RAG over the product catalog | ⬜ Next |
-| 7 | Guardrails and scope enforcement | ⬜ |
+| 6 | RAG over the product catalog | ✅ Done |
+| 7 | Guardrails and scope enforcement | ⬜ Next |
 | 8 | Governance: audit, explainability, feedback, eval | ⬜ |
 | 9 | Streaming and hardening | ⬜ |
 | 10 | React frontend | ⬜ |
@@ -273,6 +273,59 @@ ids, so any answer can be traced back to what produced it.
   request fails at commit time after the assistant has already composed a good
   reply. This was a real bug, found by asking one shopper about another's order.
 
+## Semantic search
+
+Catalog search is hybrid: retrieval decides which products a phrase is *about*,
+and SQL decides what may actually be shown.
+
+```
+"gift for someone who runs"                → 2 running shoes
+"noise cancelling headphones for a flight" → all 4 headphones, Sony XM5 first
+"something to keep me warm"                → down jacket, fleece hoodie (plus noise)
+"I need to make tea and coffee"            → nothing
+```
+
+None of these contain a word that appears in the product descriptions, so the
+keyword path returns nothing for all four.
+
+**Retrieval proposes, SQL disposes.** An embedding has no idea what anything
+costs or whether it is in stock, so price, brand, category and stock filters run
+in SQL *after* retrieval, against candidate SKUs. Everything shown is re-read
+from the database, so a stale index can never surface an out-of-date price — the
+index holds only SKUs and embedded text.
+
+**Retrieval never has the last word.** If the index is not ready, returns
+nothing, or has everything filtered away, search falls through to the keyword
+path. An unreachable embedding model degrades search; it does not break it.
+
+The catalog is embedded once with `nomic-embed-text` (3.7s for 60 products) and
+persisted to `data/vector-store.json`, rebuilt when the file is missing or the
+product count no longer matches.
+
+### The threshold was measured, not guessed
+
+Similarity scores from `nomic-embed-text` over short product descriptions sit in
+a narrow band. Measured directly against Ollama:
+
+```
+query: "something to keep me warm"        query: "I need to make tea and coffee"
+  down jacket   0.6050                      chinos       0.4645
+  hoodie        0.5619                      flask        0.4564
+  flask         0.5541                      down jacket  0.3817
+  chinos        0.4939                      hoodie       0.3533
+```
+
+A strong match reaches ~0.60 and an unrelated item still scores ~0.45, so
+ranking in the middle is close to arbitrary — note that chinos out-score a flask
+for "tea and coffee". Cutting at **0.55** keeps the confident head of the
+ranking and discards the rest, which then falls through to keyword search.
+Returning nothing beats returning chinos.
+
+I also tested `nomic-embed-text`'s documented `search_query:` / `search_document:`
+task prefixes. They made results **worse** on this data — with prefixes, a
+vacuum flask out-ranks a down jacket for "keep me warm" — so they are not used.
+That was measured before implementing rather than assumed from the model card.
+
 ## Accuracy and limitations
 
 Measured against `qwen2.5:7b` on this dataset. Recorded plainly because the
@@ -307,6 +360,7 @@ caught by the backend**:
 | Claimed "we have 2 available" | Invented — no tool returns stock counts |
 | Reported an order placed on a date that was its ETA | Wrong date shown |
 | Would not chain a second tool call to recover from an error | Purchase flow stalls |
+| Asked a clarifying question instead of searching | No results until re-asked more directly |
 
 The first two are contained: the shopper sees an error, not a wrong order. The
 rest are **real inaccuracies a shopper would see**. A tool-calling architecture
@@ -325,9 +379,13 @@ prose around them is.
 - **Prompt rules are requests, not constraints.** Prompt injection was refused in
   testing, but that is the model choosing to comply. The guarantees above hold
   because of code, not because of the prompt.
-- **No RAG yet.** Search is SQL `LIKE`, so "something to keep me warm" finds
-  nothing. Phase 6 adds semantic retrieval.
+- **Retrieval quality is limited by the embedding model.** See the RAG section.
 - **Latency is 1–11 seconds** per reply on CPU, longer when tools are called.
+- **Semantic ranking is noisy in the middle.** "Something to keep me warm"
+  returns a down jacket and a fleece hoodie, but also a training tee and a vacuum
+  flask, because those genuinely score above the threshold. A larger embedding
+  model, or richer product text, would separate them; tuning the threshold
+  further only trades this noise for empty results on valid queries.
 
 The default `dev` profile runs H2 in **MySQL compatibility mode**, so a single set
 of Flyway migrations works against both H2 and a real MySQL server. This keeps a
