@@ -14,7 +14,7 @@ Runs entirely on free, local tooling. No paid APIs, no cloud infrastructure.
 
 ## Status
 
-Built phase by phase. Current: **Phase 4 — the assistant talks, but cannot yet look anything up.**
+Built phase by phase. Current: **Phase 5 — the assistant answers from the database, via tools.**
 
 | Phase | Scope | Status |
 |-------|-------|--------|
@@ -23,8 +23,8 @@ Built phase by phase. Current: **Phase 4 — the assistant talks, but cannot yet
 | 2 | Auth: signup, login, BCrypt, JWT security chain | ✅ Done |
 | 3 | Deterministic REST API, scoped to the signed-in user | ✅ Done |
 | 4 | Ollama + Spring AI wiring, conversational chat | ✅ Done |
-| 5 | Tool calling (search, orders, draft→confirm purchase) | ⬜ Next |
-| 6 | RAG over the product catalog | ⬜ |
+| 5 | Tool calling (search, orders, draft→confirm purchase) | ✅ Done |
+| 6 | RAG over the product catalog | ⬜ Next |
 | 7 | Guardrails and scope enforcement | ⬜ |
 | 8 | Governance: audit, explainability, feedback, eval | ⬜ |
 | 9 | Streaming and hardening | ⬜ |
@@ -203,18 +203,34 @@ continue one.
 curl -s -X POST http://localhost:8080/api/chat -H "Authorization: Bearer PASTE_TOKEN_HERE" -H "Content-Type: application/json" -d "{\"message\":\"What can you help me with?\"}"
 ```
 
-### The assistant cannot look anything up yet
+### Tools
 
-That is the point of this phase, not a gap in it. There are no tools until Phase
-5, so the system prompt tells the model plainly that it has no access to the
-catalog or to order records, and to say so rather than guess. Asked whether Nike
-t-shirts are in stock, it answers that it cannot check — which is the correct
-answer for a system that genuinely cannot.
+The assistant reaches data only through nine tools. Each one calls the same
+services the REST API calls, so a tool can never see more than an HTTP client
+can.
 
-An assistant that instead replied "yes, we have four in stock from ₹1,299" would
-be inventing, and inventing is the failure this project is built to design out.
-Phase 5 gives it the ability to answer that question truthfully by calling the
-Phase 3 endpoints.
+| Tool | What it does |
+|------|--------------|
+| `searchProducts` | Filtered catalog search, capped at 8 results |
+| `getProductDetails` | One product by exact SKU |
+| `checkStock` | Whether a quantity can be bought — yes or no, never a count |
+| `listMyOrders` | The signed-in shopper's orders. **Takes no arguments** |
+| `getOrderStatus` | One order in full, with its tracking timeline |
+| `getDeliveryEstimate` | Recorded ETA and latest tracking update |
+| `createOrderDraft` | Prices a proposal. **Buys nothing** |
+| `confirmOrder` | The only path to a real order |
+| `cancelOrder` | Cancels, if the status still allows it |
+
+**No tool takes a customer argument.** The shopper is resolved from the
+authenticated session inside the service layer, so the model has no parameter
+through which it could name a different account — not because it is told not to,
+but because the vocabulary to express it does not exist. A test asserts this
+reflectively, so adding such a parameter later fails the build.
+
+**Buying takes two calls that cannot be combined.** `createOrderDraft` returns a
+reference and a total; only `confirmOrder`, with that reference, creates an
+order. A model that is confused, over-eager, or argued into a purchase has no
+single call that completes one.
 
 ### What is recorded
 
@@ -249,6 +265,69 @@ ids, so any answer can be traced back to what produced it.
   The response names no host, port or library.
 - **`/actuator/health` includes the model**, so an operator can tell a model
   outage from an application fault without reading logs.
+- **The model call happens outside any transaction.** `ChatService` is not
+  `@Transactional`; `ConversationStore` commits the question before the call and
+  the answer after. One transaction around the whole turn would hold a pooled
+  connection for the several seconds a local model takes — and worse, an ordinary
+  "no such order" from a tool marks that shared transaction rollback-only, so the
+  request fails at commit time after the assistant has already composed a good
+  reply. This was a real bug, found by asking one shopper about another's order.
+
+## Accuracy and limitations
+
+Measured against `qwen2.5:7b` on this dataset. Recorded plainly because the
+gap between what the backend guarantees and what the model does is the whole
+point of the design.
+
+### What the backend guarantees
+
+These hold regardless of what the model does, and are covered by tests:
+
+- A shopper cannot read, cancel, or reach another shopper's order or
+  conversation, even given a real identifier.
+- A real identifier belonging to someone else is indistinguishable from one that
+  never existed.
+- No purchase is created without a draft reference issued by a prior call.
+- Confirming the same draft twice returns the first order rather than creating a
+  second.
+- An expired draft is refused rather than charged at a stale price.
+- Stock is re-checked at confirmation and decremented on success.
+- Quantities are bounded (10 per line, 10 lines) and unknown SKUs are rejected.
+
+### What the model gets wrong
+
+Every one of the following was observed in live testing, and **every one was
+caught by the backend**:
+
+| Observed | Outcome |
+|----------|---------|
+| Invented a SKU (`NIK-TL-001` for `NIK-TS-001`) | Rejected as unknown; no order |
+| Fabricated a draft reference (`ORD-2023-000001`) | Rejected; no order |
+| Quoted ₹2,499.99 when the tool returned ₹3,598.00 | Wrong number shown to the shopper |
+| Claimed "we have 2 available" | Invented — no tool returns stock counts |
+| Reported an order placed on a date that was its ETA | Wrong date shown |
+| Would not chain a second tool call to recover from an error | Purchase flow stalls |
+
+The first two are contained: the shopper sees an error, not a wrong order. The
+rest are **real inaccuracies a shopper would see**. A tool-calling architecture
+guarantees that transactional actions are correct; it does not guarantee the
+prose around them is.
+
+### Known limitations
+
+- **The purchase flow does not reliably complete end to end** with a 7B model.
+  It searches, drafts correctly, and stops before confirming — usually because it
+  mistyped a SKU it was recalling from an earlier turn, or asked for confirmation
+  a second time instead of calling `confirmOrder`. The backend path is correct
+  and covered by tests; the gap is the model's multi-step tool use. A larger
+  model, or a UI that lets the shopper click a drafted order rather than
+  re-stating it in prose, would close it.
+- **Prompt rules are requests, not constraints.** Prompt injection was refused in
+  testing, but that is the model choosing to comply. The guarantees above hold
+  because of code, not because of the prompt.
+- **No RAG yet.** Search is SQL `LIKE`, so "something to keep me warm" finds
+  nothing. Phase 6 adds semantic retrieval.
+- **Latency is 1–11 seconds** per reply on CPU, longer when tools are called.
 
 The default `dev` profile runs H2 in **MySQL compatibility mode**, so a single set
 of Flyway migrations works against both H2 and a real MySQL server. This keeps a

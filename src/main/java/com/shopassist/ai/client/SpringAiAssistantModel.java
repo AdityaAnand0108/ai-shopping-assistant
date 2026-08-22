@@ -1,5 +1,8 @@
 package com.shopassist.ai.client;
 
+import com.shopassist.ai.tools.CatalogTools;
+import com.shopassist.ai.tools.OrderTools;
+import com.shopassist.ai.tools.PurchaseTools;
 import com.shopassist.common.ModelUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -15,7 +18,8 @@ import java.util.List;
 /**
  * The Ollama-backed implementation of {@link AssistantModel}.
  *
- * <p>This is the only class in the project that knows Spring AI exists.
+ * <p>This is the only class in the project that knows Spring AI exists, and the
+ * single place where the assistant's tools are attached.
  */
 @Component
 @Slf4j
@@ -23,10 +27,19 @@ public class SpringAiAssistantModel implements AssistantModel {
 
     private final ChatClient chatClient;
     private final ModelProperties properties;
+    private final Object[] tools;
 
-    public SpringAiAssistantModel(ChatClient chatClient, ModelProperties properties) {
+    public SpringAiAssistantModel(ChatClient chatClient,
+                                  ModelProperties properties,
+                                  CatalogTools catalogTools,
+                                  OrderTools orderTools,
+                                  PurchaseTools purchaseTools) {
         this.chatClient = chatClient;
         this.properties = properties;
+        // Registered here rather than passed through AssistantExchange: which
+        // tools exist is a property of this adapter, not something a caller in
+        // the domain should be able to vary per request.
+        this.tools = new Object[]{catalogTools, orderTools, purchaseTools};
     }
 
     @Override
@@ -37,6 +50,7 @@ public class SpringAiAssistantModel implements AssistantModel {
                     .system(exchange.systemPrompt())
                     .messages(toSpringAiMessages(exchange.history()))
                     .user(exchange.userMessage())
+                    .tools(tools)
                     .options(OllamaChatOptions.builder()
                             .model(properties.chatModel())
                             .temperature(properties.temperature())

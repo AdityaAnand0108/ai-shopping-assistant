@@ -103,7 +103,8 @@ class ChatApiTest {
 
         assertThat(stub.lastExchange().systemPrompt())
                 .contains("shopping assistant")
-                .contains("do NOT yet have access to the product catalog");
+                .contains("Every factual claim you make must come from a tool result")
+                .contains("Never call confirmOrder in the same reply");
     }
 
     @Test

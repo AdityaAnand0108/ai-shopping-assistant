@@ -4,137 +4,56 @@ import com.shopassist.ai.client.AssistantExchange;
 import com.shopassist.ai.client.AssistantModel;
 import com.shopassist.ai.client.AssistantReply;
 import com.shopassist.ai.prompt.SystemPrompts;
-import com.shopassist.common.ChatProperties;
-import com.shopassist.common.ResourceNotFoundException;
-import com.shopassist.security.CurrentUserService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 /**
- * Runs a chat turn: persist the question, ask the model, persist the answer.
+ * Runs a chat turn: record the question, ask the model, record the answer.
  *
- * <p>Both turns are written whatever happens, so the record of what a shopper
- * asked survives even when the model fails to answer.
+ * <p>Deliberately <b>not</b> {@code @Transactional}. The database work lives in
+ * {@link ConversationStore}, which commits the question before the model is
+ * called and the answer after. Wrapping the whole turn in one transaction would
+ * hold a pooled connection open for the several seconds a local model takes, and
+ * — worse — an ordinary "no such order" from a tool would mark that shared
+ * transaction rollback-only and fail the request at commit time, after the
+ * assistant had already composed a good reply.
+ *
+ * <p>A consequence worth knowing: if the model fails, the shopper's question is
+ * already committed and no assistant turn joins it. That is the right way round.
+ * What someone asked is worth keeping; a reply that never existed is not.
  */
 @Service
 @Slf4j
 public class ChatService {
 
-    private final ConversationRepository conversationRepository;
-    private final ChatMessageRepository messageRepository;
+    private final ConversationStore store;
     private final AssistantModel assistantModel;
-    private final CurrentUserService currentUserService;
-    private final ChatProperties properties;
 
-    public ChatService(ConversationRepository conversationRepository,
-                       ChatMessageRepository messageRepository,
-                       AssistantModel assistantModel,
-                       CurrentUserService currentUserService,
-                       ChatProperties properties) {
-        this.conversationRepository = conversationRepository;
-        this.messageRepository = messageRepository;
+    public ChatService(ConversationStore store, AssistantModel assistantModel) {
+        this.store = store;
         this.assistantModel = assistantModel;
-        this.currentUserService = currentUserService;
-        this.properties = properties;
     }
 
-    @Transactional
     public ChatResponse send(ChatRequest request) {
         String question = request.message().strip();
-        Conversation conversation = resolveConversation(request.conversationId());
-        conversation.titleFrom(question);
 
-        // History is read before the new question is written, so the question is
-        // not duplicated as both history and the current turn.
-        List<AssistantExchange.HistoryTurn> history = recentHistory(conversation);
-
-        messageRepository.save(attach(conversation, ChatMessage.fromShopper(question)));
+        ConversationStore.PreparedTurn turn = store.startTurn(request.conversationId(), question);
 
         AssistantReply reply = assistantModel.reply(new AssistantExchange(
-                SystemPrompts.CONVERSATIONAL, history, question));
+                SystemPrompts.WITH_TOOLS, turn.history(), question));
 
-        ChatMessage answer = messageRepository.save(attach(conversation,
-                ChatMessage.fromAssistant(reply.content(), reply.model(), reply.latencyMs())));
+        ChatMessage answer = store.recordReply(turn.conversationRef(), reply);
 
-        // Touches updated_at so the history list orders by recent activity.
-        conversationRepository.save(conversation);
-
-        return new ChatResponse(conversation.getPublicRef(), ChatMessageResponse.from(answer));
+        return new ChatResponse(turn.conversationRef(), ChatMessageResponse.from(answer));
     }
 
-    @Transactional(readOnly = true)
     public List<ConversationSummaryResponse> myConversations() {
-        return conversationRepository
-                .findByUserIdOrderByUpdatedAtDesc(currentUserService.requireUserId())
-                .stream()
-                .map(conversation -> ConversationSummaryResponse.from(
-                        conversation, messageRepository.countByConversationId(conversation.getId())))
-                .toList();
+        return store.myConversations();
     }
 
-    @Transactional(readOnly = true)
     public ConversationDetailResponse myConversation(String conversationId) {
-        Conversation conversation = requireOwnedConversation(conversationId);
-        return ConversationDetailResponse.from(conversation,
-                messageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId()));
-    }
-
-    /**
-     * Continues the named thread, or opens a new one.
-     *
-     * <p>A conversation reference that is unknown, or belongs to someone else,
-     * raises the same not-found either way — the same indistinguishability the
-     * order lookups rely on.
-     */
-    private Conversation resolveConversation(String conversationId) {
-        if (conversationId == null || conversationId.isBlank()) {
-            return conversationRepository.save(Conversation.builder()
-                    .user(currentUserService.requireUser())
-                    .build());
-        }
-        return requireOwnedConversation(conversationId);
-    }
-
-    private Conversation requireOwnedConversation(String conversationId) {
-        return conversationRepository
-                .findByPublicRefAndUserId(conversationId, currentUserService.requireUserId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No conversation found with id " + conversationId));
-    }
-
-    /**
-     * The last few turns, oldest first.
-     *
-     * <p>Fetched newest-first with a limit and then reversed, so a long thread
-     * costs one bounded query rather than loading every message ever sent just to
-     * discard most of them.
-     */
-    private List<AssistantExchange.HistoryTurn> recentHistory(Conversation conversation) {
-        if (conversation.getId() == null) {
-            return List.of();
-        }
-
-        List<ChatMessage> newestFirst = messageRepository.findByConversationIdOrderByCreatedAtDesc(
-                conversation.getId(), Limit.of(properties.maxTurnsInContext()));
-
-        List<ChatMessage> oldestFirst = new ArrayList<>(newestFirst);
-        oldestFirst.sort(Comparator.comparing(ChatMessage::getCreatedAt)
-                .thenComparing(ChatMessage::getId));
-
-        return oldestFirst.stream()
-                .map(message -> new AssistantExchange.HistoryTurn(
-                        message.getRole().isFromShopper(), message.getContent()))
-                .toList();
-    }
-
-    private static ChatMessage attach(Conversation conversation, ChatMessage message) {
-        message.setConversation(conversation);
-        return message;
+        return store.myConversation(conversationId);
     }
 }
