@@ -106,6 +106,20 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * The model server is down, or returned nothing usable.
+     *
+     * <p>503 rather than 500 because this is a dependency being unavailable, not
+     * the shop being broken, and the distinction tells a client whether retrying
+     * is worth anything.
+     */
+    @ExceptionHandler(ModelUnavailableException.class)
+    public ProblemDetail handleModelUnavailable(ModelUnavailableException ex) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Assistant unavailable",
+                "The assistant is temporarily unavailable. Please try again shortly.",
+                "model-unavailable");
+    }
+
+    /**
      * Last resort. Logs the real cause server-side and returns nothing useful to
      * the caller — an unexpected failure must not become a disclosure channel.
      */

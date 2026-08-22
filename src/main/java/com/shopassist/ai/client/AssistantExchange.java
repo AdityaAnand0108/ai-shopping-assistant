@@ -1,0 +1,22 @@
+package com.shopassist.ai.client;
+
+import java.util.List;
+
+/**
+ * Everything sent to the model for one turn.
+ *
+ * @param systemPrompt the standing instructions
+ * @param history      earlier turns, oldest first, already windowed
+ * @param userMessage  what the shopper just asked
+ */
+public record AssistantExchange(
+        String systemPrompt,
+        List<HistoryTurn> history,
+        String userMessage
+) {
+    /**
+     * @param fromShopper true for a shopper turn, false for an assistant turn
+     */
+    public record HistoryTurn(boolean fromShopper, String content) {
+    }
+}

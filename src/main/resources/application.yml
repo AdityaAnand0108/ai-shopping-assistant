@@ -29,6 +29,12 @@ spring:
       embedding:
         options:
           model: ${OLLAMA_EMBED_MODEL:nomic-embed-text}
+  # A local model is far slower than a REST call. The default 60s read timeout
+  # is not enough for a 7B model composing a few sentences on CPU.
+  http:
+    client:
+      read-timeout: 180s
+      connect-timeout: 10s
 
 server:
   port: ${SERVER_PORT:8080}
@@ -43,7 +49,7 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: never
+      show-details: always
 
 springdoc:
   swagger-ui:
@@ -55,6 +61,10 @@ logging:
 
 # Application-specific settings (expanded in later phases)
 shopassist:
+  model:
+    chat-model: ${OLLAMA_CHAT_MODEL:qwen2.5:7b}
+    embedding-model: ${OLLAMA_EMBED_MODEL:nomic-embed-text}
+    temperature: 0.1
   jwt:
     # Development default. Override with SHOPASSIST_JWT_SECRET anywhere real;
     # the application logs a warning while this value is in use.

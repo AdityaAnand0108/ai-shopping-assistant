@@ -14,7 +14,7 @@ Runs entirely on free, local tooling. No paid APIs, no cloud infrastructure.
 
 ## Status
 
-Built phase by phase. Current: **Phase 3 — the backend works end to end with no AI.**
+Built phase by phase. Current: **Phase 4 — the assistant talks, but cannot yet look anything up.**
 
 | Phase | Scope | Status |
 |-------|-------|--------|
@@ -22,8 +22,8 @@ Built phase by phase. Current: **Phase 3 — the backend works end to end with n
 | 1 | Domain model, migrations, CSV seed data | ✅ Done |
 | 2 | Auth: signup, login, BCrypt, JWT security chain | ✅ Done |
 | 3 | Deterministic REST API, scoped to the signed-in user | ✅ Done |
-| 4 | Ollama + Spring AI wiring, plain chat | ⬜ Next |
-| 5 | Tool calling (search, orders, draft→confirm purchase) | ⬜ |
+| 4 | Ollama + Spring AI wiring, conversational chat | ✅ Done |
+| 5 | Tool calling (search, orders, draft→confirm purchase) | ⬜ Next |
 | 6 | RAG over the product catalog | ⬜ |
 | 7 | Guardrails and scope enforcement | ⬜ |
 | 8 | Governance: audit, explainability, feedback, eval | ⬜ |
@@ -187,6 +187,68 @@ so there is no URL to edit to reach somebody else's.
   named orderings. A free-text sort parameter would let a caller order by
   `stockQuantity` and read inventory back out of the ordering. Each ordering
   appends SKU as a tiebreak, so paging cannot repeat or skip a row.
+
+## Chat
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/api/chat` | Send a message, get a reply |
+| `GET` | `/api/chat/conversations` | Your threads, most recently active first |
+| `GET` | `/api/chat/conversations/{id}` | Replay one thread |
+
+All three require a token. Omit `conversationId` to start a thread; pass it to
+continue one.
+
+```bash
+curl -s -X POST http://localhost:8080/api/chat -H "Authorization: Bearer PASTE_TOKEN_HERE" -H "Content-Type: application/json" -d "{\"message\":\"What can you help me with?\"}"
+```
+
+### The assistant cannot look anything up yet
+
+That is the point of this phase, not a gap in it. There are no tools until Phase
+5, so the system prompt tells the model plainly that it has no access to the
+catalog or to order records, and to say so rather than guess. Asked whether Nike
+t-shirts are in stock, it answers that it cannot check — which is the correct
+answer for a system that genuinely cannot.
+
+An assistant that instead replied "yes, we have four in stock from ₹1,299" would
+be inventing, and inventing is the failure this project is built to design out.
+Phase 5 gives it the ability to answer that question truthfully by calling the
+Phase 3 endpoints.
+
+### What is recorded
+
+Every turn is persisted — both sides — along with the model that produced each
+reply and how long it took:
+
+```
+role      | model      | latency_ms | content
+USER      | null       | null       | Do you have Nike t-shirts in stock…
+ASSISTANT | qwen2.5:7b | 1066       | I can't check stock or prices right now…
+```
+
+Phase 8 hangs the tool-call audit trail and shopper feedback off these message
+ids, so any answer can be traced back to what produced it.
+
+### Design notes
+
+- **`AssistantModel` is an interface.** Exactly one class knows Spring AI exists.
+  That makes the chat surface testable with no model server running, keeps the
+  provider swappable, and gives Phase 5 one place to attach tool calling.
+- **History is windowed** to the last 12 turns, fetched newest-first with a SQL
+  limit and reversed. An unbounded thread would grow the prompt until it
+  overflowed the context window, and that failure arrives as a quietly worse
+  answer rather than an error.
+- **Conversations are owner-scoped** the same way orders are, and the repository
+  again has no lookup that omits the owner. Another shopper cannot read a thread
+  or post into one even with a valid conversation id.
+- **Temperature is 0.1.** This assistant reports facts fetched from a database;
+  a creative rephrasing of an order status is simply a wrong answer.
+- **A model outage returns 503**, not 500 — a dependency being down is not the
+  shop being broken, and the distinction tells a client whether retrying helps.
+  The response names no host, port or library.
+- **`/actuator/health` includes the model**, so an operator can tell a model
+  outage from an application fault without reading logs.
 
 The default `dev` profile runs H2 in **MySQL compatibility mode**, so a single set
 of Flyway migrations works against both H2 and a real MySQL server. This keeps a
