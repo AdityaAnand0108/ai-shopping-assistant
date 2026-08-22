@@ -1,8 +1,7 @@
 package com.shopassist.security;
 
-import com.shopassist.user.AppUser;
-import com.shopassist.user.UserRole;
-
+import com.shopassist.entity.user.AppUser;
+import com.shopassist.enums.user.UserRole;
 import java.time.Instant;
 
 /**

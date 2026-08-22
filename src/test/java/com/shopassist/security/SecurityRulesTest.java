@@ -1,9 +1,11 @@
 package com.shopassist.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shopassist.common.DemoDataInstaller;
-import com.shopassist.user.AppUser;
-import com.shopassist.user.AppUserRepository;
+import com.shopassist.config.security.JwtProperties;
+import com.shopassist.dto.auth.LoginRequest;
+import com.shopassist.entity.user.AppUser;
+import com.shopassist.repository.user.AppUserRepository;
+import com.shopassist.services.DemoDataInstaller;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -220,7 +222,7 @@ class SecurityRulesTest {
 
     private String tokenFor(String username, String password) throws Exception {
         String body = objectMapper.writeValueAsString(
-                new com.shopassist.auth.LoginRequest(username, password));
+                new com.shopassist.dto.auth.LoginRequest(username, password));
 
         String response = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON).content(body))

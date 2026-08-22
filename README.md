@@ -477,21 +477,47 @@ ollama pull nomic-embed-text
 
 ## Project layout
 
+Packages are organised **layer-first, then by business domain**: the top level
+names a technical responsibility, and the domain appears beneath it. Every
+package carries a `package-info.java` describing its role and the invariants
+that hold across it.
+
 ```
 src/main/java/com/shopassist/
-├── catalog/      Products: entity, repository, service, REST API
-├── order/        Orders, order items, status timeline
-├── customer/     Customer identity and session scoping
-├── chat/         Conversations and messages — the only AI entry point
-├── ai/
-│   ├── client/   ChatClient configuration
-│   ├── tools/    @Tool methods — the only way the model reaches data
-│   ├── rag/      Embedding pipeline and retriever
-│   ├── prompt/   System prompts and templates
-│   └── guard/    Input and output guardrails
-├── governance/   Tool-call audit, feedback, accuracy evaluation
-└── common/       Shared DTOs, error handling, configuration
+├── ShopAssistantApplication.java
+├── advice/           GlobalExceptionHandler - the single exit for every error
+├── config/           @Configuration and @ConfigurationProperties
+│   ├── ai/           model + retrieval settings
+│   ├── chat/         chat turn bounds
+│   └── security/     filter chain, JWT settings, password hashing
+├── controllers/      HTTP entry points
+│   ├── auth/  catalog/  chat/  order/
+├── dto/              request, response and cross-layer records
+│   ├── ai/  auth/  catalog/  chat/  order/
+├── entity/           JPA entities
+│   ├── catalog/  chat/  order/  user/
+├── enums/            closed value sets
+│   ├── catalog/  chat/  order/  user/
+├── exception/        application exceptions
+│   ├── ai/  auth/
+├── repository/       Spring Data repositories
+│   ├── catalog/  chat/  order/  user/
+├── scheduler/        startup runners: demo data, then the semantic index
+├── security/         principal, token issuing/verification, filter, denylist
+├── services/         business logic
+│   ├── ai/           model client + retriever (the only Spring AI importers)
+│   │   └── tools/    @Tool methods - the only way the model reaches data
+│   ├── auth/  catalog/  chat/  order/
+└── util/             stateless helpers
+    ├── ai/           system prompts
+    └── catalog/      CSV loading
 ```
+
+There is no `validation/` package: validation is expressed with Jakarta
+constraints on the DTOs themselves, and `ProductSearchCriteria` normalises and
+bounds its own values in its constructor. No class would belong there.
+
+Test packages mirror this layout.
 
 ## Design note
 

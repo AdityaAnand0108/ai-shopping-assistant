@@ -8,9 +8,10 @@
  * identity argument; and they cannot complete a purchase in one step. Prompts
  * ask the model to behave well, but nothing important depends on it doing so.
  *
- * <p>Packages are organised by feature rather than by layer, so everything about
- * orders lives together. The {@code ai} subtree is the only place that knows a
- * language model exists; every other package would compile and work unchanged if
- * the assistant were removed.
+ * <p>Packages are organised <b>layer-first, then by business domain</b>: the
+ * top level names a technical responsibility ({@code controllers},
+ * {@code services}, {@code repository}, {@code entity}, {@code dto}), and the
+ * domain appears beneath it ({@code services.order}, {@code dto.catalog}). The
+ * six domains are ai, auth, catalog, chat, order and user.
  */
 package com.shopassist;

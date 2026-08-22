@@ -1,12 +1,11 @@
 package com.shopassist.security;
 
-import com.shopassist.user.AppUser;
-import com.shopassist.user.AppUserRepository;
+import com.shopassist.entity.user.AppUser;
+import com.shopassist.repository.user.AppUserRepository;
+import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-
-import java.util.Optional;
 
 /**
  * Resolves the caller from the security context.
