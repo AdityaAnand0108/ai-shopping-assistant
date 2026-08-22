@@ -7,6 +7,7 @@ import com.shopassist.exception.InvalidRequestException;
 import com.shopassist.services.catalog.ProductService;
 import java.math.BigDecimal;
 import java.util.List;
+import com.shopassist.services.ai.guard.ToolCallRecorder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -32,9 +33,11 @@ public class CatalogTools {
     private static final int MAX_RESULTS = 8;
 
     private final ProductService productService;
+    private final ToolCallRecorder recorder;
 
-    public CatalogTools(ProductService productService) {
+    public CatalogTools(ProductService productService, ToolCallRecorder recorder) {
         this.productService = productService;
+        this.recorder = recorder;
     }
 
     @Tool(name = "searchProducts", description = """
@@ -81,7 +84,8 @@ public class CatalogTools {
                         p.price(), p.availability()))
                 .toList();
 
-        return new ProductSearchResult(matches, page.totalElements(), matches.size());
+        return recorder.recorded("searchProducts",
+                new ProductSearchResult(matches, page.totalElements(), matches.size()));
     }
 
     @Tool(name = "getProductDetails", description = """
@@ -94,10 +98,11 @@ public class CatalogTools {
 
         log.info("Tool getProductDetails(sku={})", sku);
         var product = productService.findBySku(sku);
-        return new ProductDetail(product.sku(), product.name(), product.brand(),
+        return recorder.recorded("getProductDetails", new ProductDetail(
+                product.sku(), product.name(), product.brand(),
                 product.category(), product.description(), product.color(),
                 product.size(), product.material(), product.price(),
-                product.rating(), product.availability());
+                product.rating(), product.availability()));
     }
 
     @Tool(name = "checkStock", description = """
@@ -119,7 +124,8 @@ public class CatalogTools {
         // Confirms the SKU is real, so an invented one is reported as unknown
         // rather than silently as "unavailable".
         productService.findBySku(sku);
-        return new StockAnswer(sku, quantity, productService.canFulfil(sku, quantity));
+        return recorder.recorded("checkStock",
+                new StockAnswer(sku, quantity, productService.canFulfil(sku, quantity)));
     }
 
     private static BigDecimal toDecimal(Double value) {

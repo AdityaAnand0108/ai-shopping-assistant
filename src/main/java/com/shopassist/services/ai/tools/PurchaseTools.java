@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.shopassist.services.ai.guard.ToolCallRecorder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -39,9 +40,11 @@ import org.springframework.stereotype.Component;
 public class PurchaseTools {
 
     private final PurchaseService purchaseService;
+    private final ToolCallRecorder recorder;
 
-    public PurchaseTools(PurchaseService purchaseService) {
+    public PurchaseTools(PurchaseService purchaseService, ToolCallRecorder recorder) {
         this.purchaseService = purchaseService;
+        this.recorder = recorder;
     }
 
     @Tool(name = "createOrderDraft", description = """
@@ -73,7 +76,7 @@ public class PurchaseTools {
                     + " then call createOrderDraft with the SKU exactly as it was returned.");
         }
 
-        return new DraftSummary(
+        return recorder.recorded("createOrderDraft", new DraftSummary(
                 draft.getPublicRef(),
                 draft.getItems().stream()
                         .map(i -> new DraftLine(i.getProduct().getSku(), i.getProduct().getName(),
@@ -83,7 +86,7 @@ public class PurchaseTools {
                 draft.getCurrency(),
                 draft.getExpiresAt(),
                 "Nothing has been bought yet. Tell the shopper the total and ask "
-                        + "them to confirm, then call confirmOrder with this reference.");
+                        + "them to confirm, then call confirmOrder with this reference."));
     }
 
     @Tool(name = "confirmOrder", description = """
@@ -99,9 +102,10 @@ public class PurchaseTools {
         log.info("Tool confirmOrder(draftReference={})", draftReference);
         var order = purchaseService.confirmDraft(draftReference);
 
-        return new PlacedOrder(order.getOrderNumber(), order.getStatus(),
+        return recorder.recorded("confirmOrder", new PlacedOrder(
+                order.getOrderNumber(), order.getStatus(),
                 order.getTotalAmount(), order.getExpectedDeliveryDate(),
-                "Order placed successfully.");
+                "Order placed successfully."));
     }
 
     @Tool(name = "cancelOrder", description = """
@@ -115,8 +119,9 @@ public class PurchaseTools {
 
         log.info("Tool cancelOrder(orderNumber={})", orderNumber);
         var order = purchaseService.cancelOrder(orderNumber);
-        return new CancelledOrder(order.getOrderNumber(), order.getStatus(),
-                "Order cancelled. A refund has been initiated.");
+        return recorder.recorded("cancelOrder", new CancelledOrder(
+                order.getOrderNumber(), order.getStatus(),
+                "Order cancelled. A refund has been initiated."));
     }
 
     /**

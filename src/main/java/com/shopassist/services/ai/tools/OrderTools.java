@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import com.shopassist.services.ai.guard.ToolCallRecorder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -28,9 +29,11 @@ import org.springframework.stereotype.Component;
 public class OrderTools {
 
     private final OrderService orderService;
+    private final ToolCallRecorder recorder;
 
-    public OrderTools(OrderService orderService) {
+    public OrderTools(OrderService orderService, ToolCallRecorder recorder) {
         this.orderService = orderService;
+        this.recorder = recorder;
     }
 
     @Tool(name = "listMyOrders", description = """
@@ -40,10 +43,10 @@ public class OrderTools {
             shopper's orders and nobody else's.""")
     public List<OrderSummary> listMyOrders() {
         log.info("Tool listMyOrders()");
-        return orderService.myOrders().stream()
+        return recorder.recorded("listMyOrders", orderService.myOrders().stream()
                 .map(o -> new OrderSummary(o.orderNumber(), o.status(), o.placedAt(),
                         o.expectedDeliveryDate(), o.totalAmount(), o.itemCount()))
-                .toList();
+                .toList());
     }
 
     @Tool(name = "getOrderStatus", description = """
@@ -59,7 +62,7 @@ public class OrderTools {
         log.info("Tool getOrderStatus(orderNumber={})", orderNumber);
         var order = orderService.myOrder(orderNumber);
 
-        return new OrderDetail(
+        return recorder.recorded("getOrderStatus", new OrderDetail(
                 order.orderNumber(),
                 order.status(),
                 order.placedAt(),
@@ -72,7 +75,7 @@ public class OrderTools {
                         .toList(),
                 order.timeline().stream()
                         .map(e -> new TrackingStep(e.status(), e.occurredAt(), e.note()))
-                        .toList());
+                        .toList()));
     }
 
     @Tool(name = "getDeliveryEstimate", description = """
@@ -90,13 +93,13 @@ public class OrderTools {
         var timeline = order.timeline();
         var latest = timeline.isEmpty() ? null : timeline.get(timeline.size() - 1);
 
-        return new DeliveryEstimate(
+        return recorder.recorded("getDeliveryEstimate", new DeliveryEstimate(
                 order.orderNumber(),
                 order.status(),
                 order.expectedDeliveryDate(),
                 order.deliveredAt(),
                 latest == null ? null : latest.note(),
-                latest == null ? null : latest.occurredAt());
+                latest == null ? null : latest.occurredAt()));
     }
 
     // --- what the model sees ------------------------------------------------

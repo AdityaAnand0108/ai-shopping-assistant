@@ -92,3 +92,16 @@ shopassist:
   guard:
     max-input-chars: 1000
     max-turns-in-context: 12
+  guardrails:
+    # Refuse plain instruction-override attempts before spending a model call.
+    block-injection: true
+    # Last line of defence against a reply naming a table, a column or a stack
+    # frame. Everything upstream is built so it cannot happen; this catches the
+    # one path that is not structural - the model writing prose of its own.
+    scan-output: true
+    # Compare each reply against what the tools actually returned, and flag
+    # figures with no source. Flags rather than blocks: see GroundingCheck.
+    check-grounding: true
+    # A chat turn costs seconds of model time, so one client can starve the
+    # machine without looking abusive. The catalog endpoints need no equivalent.
+    messages-per-minute: 20

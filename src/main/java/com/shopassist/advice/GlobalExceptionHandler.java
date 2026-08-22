@@ -2,7 +2,9 @@ package com.shopassist.advice;
 
 import com.shopassist.exception.InvalidRequestException;
 import com.shopassist.exception.ResourceNotFoundException;
+import com.shopassist.exception.ai.GuardrailViolationException;
 import com.shopassist.exception.ai.ModelUnavailableException;
+import com.shopassist.exception.ai.RateLimitExceededException;
 import com.shopassist.exception.auth.AccountLockedException;
 import com.shopassist.exception.auth.AuthenticationFailedException;
 import com.shopassist.exception.auth.DuplicateAccountException;
@@ -108,6 +110,29 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleDuplicateAccount(DuplicateAccountException ex) {
         return problem(HttpStatus.CONFLICT, "Account already exists",
                 ex.getMessage(), "duplicate-account");
+    }
+
+    /**
+     * A message was refused before it reached the model.
+     *
+     * <p>200 rather than 4xx, and carrying a normal assistant reply. A refusal
+     * is part of the conversation, not a failed request, and a chat client that
+     * had to special-case an error status to render one turn would be the worse
+     * design. The refusal is visible in {@code insight} instead.
+     */
+    @ExceptionHandler(GuardrailViolationException.class)
+    public ProblemDetail handleGuardrailViolation(GuardrailViolationException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Message declined",
+                ex.getMessage(), "guardrail");
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ProblemDetail handleRateLimited(RateLimitExceededException ex) {
+        ProblemDetail problem = problem(HttpStatus.TOO_MANY_REQUESTS, "Too many messages",
+                "You are sending messages faster than the assistant can answer. "
+                        + "Please wait a moment and try again.", "rate-limit");
+        problem.setProperty("retryAfterSeconds", ex.getRetryAfterSeconds());
+        return problem;
     }
 
     /**
