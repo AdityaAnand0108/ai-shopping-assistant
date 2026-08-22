@@ -68,8 +68,8 @@ class ProductCatalogTest {
         assertThat(tee.getSubcategory()).isEqualTo("T-Shirts");
         assertThat(tee.getColor()).isEqualTo("Black");
         assertThat(tee.getSizeLabel()).isEqualTo("M");
-        assertThat(tee.getPrice()).isEqualByComparingTo("1799");
-        assertThat(tee.getCurrency()).isEqualTo("INR");
+        assertThat(tee.getPrice()).isEqualByComparingTo("34.99");
+        assertThat(tee.getCurrency()).isEqualTo("USD");
         assertThat(tee.getStockQuantity()).isEqualTo(42);
         assertThat(tee.getRating()).isEqualByComparingTo("4.4");
         assertThat(tee.getImageUrl()).contains("NIK-TS-001");
@@ -111,13 +111,13 @@ class ProductCatalogTest {
     @Test
     void appliesPriceBoundsInSql() {
         var budget = productRepository.search(
-                null, null, "Apparel", BigDecimal.valueOf(500), BigDecimal.valueOf(1200),
+                null, null, "Apparel", BigDecimal.valueOf(20), BigDecimal.valueOf(35),
                 false, PageRequest.of(0, 50));
 
         assertThat(budget.getContent())
                 .isNotEmpty()
                 .allSatisfy(p -> assertThat(p.getPrice())
-                        .isBetween(BigDecimal.valueOf(500), BigDecimal.valueOf(1200)));
+                        .isBetween(BigDecimal.valueOf(20), BigDecimal.valueOf(35)));
     }
 
     @Test

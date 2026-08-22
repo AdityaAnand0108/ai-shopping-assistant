@@ -60,7 +60,7 @@ class OrderApiTest {
 
     @Test
     void listsTheSignedInShoppersOrdersNewestFirst() throws Exception {
-        mockMvc.perform(get("/api/orders").header("Authorization", bearer("aditya", "Password123")))
+        mockMvc.perform(get("/api/orders").header("Authorization", bearer("satvik", "Password123")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(5)))
                 .andExpect(jsonPath("$[0].status").value("PLACED"));
@@ -75,9 +75,9 @@ class OrderApiTest {
 
     @Test
     void summaryCountsUnitsRatherThanLines() throws Exception {
-        // Priya's delivered order is a single line of three tees.
+        // Sarah's delivered order is a single line of three tees.
         String body = mockMvc.perform(get("/api/orders")
-                        .header("Authorization", bearer("priya", "Password123")))
+                        .header("Authorization", bearer("sarah", "Password123")))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -86,20 +86,20 @@ class OrderApiTest {
                 .findFirst().orElseThrow();
 
         assertThat(delivered.get("itemCount").asInt()).isEqualTo(3);
-        assertThat(delivered.get("totalAmount").asDouble()).isEqualTo(2970.0);
+        assertThat(delivered.get("totalAmount").asDouble()).isEqualTo(59.70);
     }
 
     // --- the ownership boundary ---------------------------------------------
 
     @Test
     void aShopperCannotReadAnotherShoppersOrder() throws Exception {
-        String adityasOrder = firstOrderNumberOf("aditya", "Password123");
+        String satviksOrder = firstOrderNumberOf("satvik", "Password123");
 
-        mockMvc.perform(get("/api/orders/" + adityasOrder)
-                        .header("Authorization", bearer("aditya", "Password123")))
+        mockMvc.perform(get("/api/orders/" + satviksOrder)
+                        .header("Authorization", bearer("satvik", "Password123")))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/orders/" + adityasOrder)
+        mockMvc.perform(get("/api/orders/" + satviksOrder)
                         .header("Authorization", bearer("rahul", "Password123")))
                 .andExpect(status().isNotFound());
     }
@@ -107,10 +107,10 @@ class OrderApiTest {
     @Test
     void aRealOrderBelongingToSomeoneElseIsIndistinguishableFromOneThatDoesNotExist()
             throws Exception {
-        String adityasOrder = firstOrderNumberOf("aditya", "Password123");
+        String satviksOrder = firstOrderNumberOf("satvik", "Password123");
         String rahulsToken = bearer("rahul", "Password123");
 
-        String notYours = mockMvc.perform(get("/api/orders/" + adityasOrder)
+        String notYours = mockMvc.perform(get("/api/orders/" + satviksOrder)
                         .header("Authorization", rahulsToken))
                 .andExpect(status().isNotFound())
                 .andReturn().getResponse().getContentAsString();
@@ -127,9 +127,9 @@ class OrderApiTest {
 
     @Test
     void theTimelineIsOwnerScopedToo() throws Exception {
-        String adityasOrder = firstOrderNumberOf("aditya", "Password123");
+        String satviksOrder = firstOrderNumberOf("satvik", "Password123");
 
-        mockMvc.perform(get("/api/orders/" + adityasOrder + "/timeline")
+        mockMvc.perform(get("/api/orders/" + satviksOrder + "/timeline")
                         .header("Authorization", bearer("rahul", "Password123")))
                 .andExpect(status().isNotFound());
     }
@@ -138,8 +138,8 @@ class OrderApiTest {
 
     @Test
     void returnsLinesAndTrackingTimelineTogether() throws Exception {
-        String token = bearer("aditya", "Password123");
-        String delivered = orderNumberWithStatus("aditya", "Password123", "DELIVERED");
+        String token = bearer("satvik", "Password123");
+        String delivered = orderNumberWithStatus("satvik", "Password123", "DELIVERED");
 
         mockMvc.perform(get("/api/orders/" + delivered).header("Authorization", token))
                 .andExpect(status().isOk())
@@ -154,13 +154,13 @@ class OrderApiTest {
 
     @Test
     void marksAnInFlightOrderCancellableAndADeliveredOneNot() throws Exception {
-        String token = bearer("aditya", "Password123");
+        String token = bearer("satvik", "Password123");
 
-        mockMvc.perform(get("/api/orders/" + orderNumberWithStatus("aditya", "Password123", "PLACED"))
+        mockMvc.perform(get("/api/orders/" + orderNumberWithStatus("satvik", "Password123", "PLACED"))
                         .header("Authorization", token))
                 .andExpect(jsonPath("$.cancellable").value(true));
 
-        mockMvc.perform(get("/api/orders/" + orderNumberWithStatus("aditya", "Password123", "DELIVERED"))
+        mockMvc.perform(get("/api/orders/" + orderNumberWithStatus("satvik", "Password123", "DELIVERED"))
                         .header("Authorization", token))
                 .andExpect(jsonPath("$.cancellable").value(false));
     }
@@ -180,9 +180,9 @@ class OrderApiTest {
 
     @Test
     void orderPayloadsCarryNoInternalIdentifiers() throws Exception {
-        String token = bearer("aditya", "Password123");
+        String token = bearer("satvik", "Password123");
         String detail = mockMvc.perform(
-                        get("/api/orders/" + firstOrderNumberOf("aditya", "Password123"))
+                        get("/api/orders/" + firstOrderNumberOf("satvik", "Password123"))
                                 .header("Authorization", token))
                 .andReturn().getResponse().getContentAsString();
 

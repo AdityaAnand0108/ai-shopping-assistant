@@ -88,7 +88,7 @@ class ChatApiTest {
     void answersAndOpensAConversation() throws Exception {
         stub.willReply("I can help you find products once I am connected to the catalog.");
 
-        mockMvc.perform(chat("aditya", """
+        mockMvc.perform(chat("satvik", """
                         {"message":"What can you do?"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.conversationId").isNotEmpty())
@@ -100,7 +100,7 @@ class ChatApiTest {
 
     @Test
     void sendsTheSystemPromptWithEveryTurn() throws Exception {
-        mockMvc.perform(chat("aditya", """
+        mockMvc.perform(chat("satvik", """
                         {"message":"Hello"}""")).andExpect(status().isOk());
 
         assertThat(stub.lastExchange().systemPrompt())
@@ -111,10 +111,10 @@ class ChatApiTest {
 
     @Test
     void bothTurnsArePersisted() throws Exception {
-        String conversationId = startConversation("aditya", "Hello there");
+        String conversationId = startConversation("satvik", "Hello there");
 
         mockMvc.perform(get("/api/chat/conversations/" + conversationId)
-                        .header("Authorization", bearer("aditya", "Password123")))
+                        .header("Authorization", bearer("satvik", "Password123")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.messages", hasSize(2)))
                 .andExpect(jsonPath("$.messages[0].role").value("USER"))
@@ -124,10 +124,10 @@ class ChatApiTest {
 
     @Test
     void titlesAThreadFromItsOpeningQuestion() throws Exception {
-        startConversation("aditya", "Do you sell running shoes?");
+        startConversation("satvik", "Do you sell running shoes?");
 
         mockMvc.perform(get("/api/chat/conversations")
-                        .header("Authorization", bearer("aditya", "Password123")))
+                        .header("Authorization", bearer("satvik", "Password123")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("Do you sell running shoes?"))
                 .andExpect(jsonPath("$[0].messageCount").value(2));
@@ -135,10 +135,10 @@ class ChatApiTest {
 
     @Test
     void trimsWhitespaceFromTheStoredQuestion() throws Exception {
-        String conversationId = startConversation("aditya", "   spaced out   ");
+        String conversationId = startConversation("satvik", "   spaced out   ");
 
         mockMvc.perform(get("/api/chat/conversations/" + conversationId)
-                        .header("Authorization", bearer("aditya", "Password123")))
+                        .header("Authorization", bearer("satvik", "Password123")))
                 .andExpect(jsonPath("$.messages[0].content").value("spaced out"));
     }
 
@@ -146,8 +146,8 @@ class ChatApiTest {
 
     @Test
     void continuesAThreadAndReplaysHistoryInOrder() throws Exception {
-        String token = bearer("aditya", "Password123");
-        String conversationId = startConversation("aditya", "First question");
+        String token = bearer("satvik", "Password123");
+        String conversationId = startConversation("satvik", "First question");
 
         mockMvc.perform(post("/api/chat").header("Authorization", token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -170,14 +170,14 @@ class ChatApiTest {
 
     @Test
     void theFirstTurnOfAThreadHasNoHistory() throws Exception {
-        startConversation("aditya", "Opening line");
+        startConversation("satvik", "Opening line");
         assertThat(stub.lastExchange().history()).isEmpty();
     }
 
     @Test
     void windowsHistorySoAnOldThreadCannotOverflowTheContext() throws Exception {
-        String token = bearer("aditya", "Password123");
-        String conversationId = startConversation("aditya", "Turn 1");
+        String token = bearer("satvik", "Password123");
+        String conversationId = startConversation("satvik", "Turn 1");
 
         for (int turn = 2; turn <= 10; turn++) {
             mockMvc.perform(post("/api/chat").header("Authorization", token)
@@ -195,42 +195,42 @@ class ChatApiTest {
 
     @Test
     void aShopperCannotReadAnotherShoppersConversation() throws Exception {
-        String adityasConversation = startConversation("aditya", "Private question");
+        String satviksConversation = startConversation("satvik", "Private question");
 
-        mockMvc.perform(get("/api/chat/conversations/" + adityasConversation)
+        mockMvc.perform(get("/api/chat/conversations/" + satviksConversation)
                         .header("Authorization", bearer("rahul", "Password123")))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void aShopperCannotPostIntoAnotherShoppersConversation() throws Exception {
-        String adityasConversation = startConversation("aditya", "Private question");
+        String satviksConversation = startConversation("satvik", "Private question");
 
         mockMvc.perform(post("/api/chat")
                         .header("Authorization", bearer("rahul", "Password123"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new ChatRequest("Injecting myself", adityasConversation))))
+                                new ChatRequest("Injecting myself", satviksConversation))))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void conversationListsAreScopedToTheirOwner() throws Exception {
-        startConversation("aditya", "Aditya's thread");
-        startConversation("priya", "Priya's thread");
+        startConversation("satvik", "Satvik's thread");
+        startConversation("sarah", "Sarah's thread");
 
         mockMvc.perform(get("/api/chat/conversations")
-                        .header("Authorization", bearer("priya", "Password123")))
+                        .header("Authorization", bearer("sarah", "Password123")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].title").value("Priya's thread"));
+                .andExpect(jsonPath("$[0].title").value("Sarah's thread"));
     }
 
     // --- input bounds -------------------------------------------------------
 
     @Test
     void rejectsAnEmptyMessageWithoutCallingTheModel() throws Exception {
-        mockMvc.perform(chat("aditya", """
+        mockMvc.perform(chat("satvik", """
                         {"message":"   "}"""))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.message").exists());
@@ -244,7 +244,7 @@ class ChatApiTest {
                 new ChatRequest("x".repeat(1001), null));
 
         mockMvc.perform(post("/api/chat")
-                        .header("Authorization", bearer("aditya", "Password123"))
+                        .header("Authorization", bearer("satvik", "Password123"))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.message").exists());
@@ -258,7 +258,7 @@ class ChatApiTest {
     void reportsAModelOutageAsUnavailableRatherThanAServerError() throws Exception {
         stub.willFailAsUnavailable();
 
-        mockMvc.perform(chat("aditya", """
+        mockMvc.perform(chat("satvik", """
                         {"message":"Are you there?"}"""))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.title").value("Assistant unavailable"));
@@ -268,7 +268,7 @@ class ChatApiTest {
     void aModelOutageLeaksNothingAboutTheInfrastructure() throws Exception {
         stub.willFailAsUnavailable();
 
-        String body = mockMvc.perform(chat("aditya", """
+        String body = mockMvc.perform(chat("satvik", """
                         {"message":"Are you there?"}"""))
                 .andReturn().getResponse().getContentAsString();
 
@@ -284,8 +284,8 @@ class ChatApiTest {
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder chat(
             String username, String json) throws Exception {
         return post("/api/chat")
-                .header("Authorization", bearer(username, "aditya".equals(username)
-                        || "priya".equals(username) || "rahul".equals(username)
+                .header("Authorization", bearer(username, "satvik".equals(username)
+                        || "sarah".equals(username) || "rahul".equals(username)
                         ? "Password123" : "Demo1234"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json);

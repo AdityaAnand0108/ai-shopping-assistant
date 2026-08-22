@@ -103,14 +103,14 @@ class HybridSearchTest {
     void aPriceCapStillBindsOnSemanticResults() {
         // Retrieval has no idea what anything costs, so the filter has to.
         stub.willReturn("UNQ-JK-001", "ZAR-JK-001", "NIK-HD-001", "ADI-HD-001");
-        var results = search("warm layer", null, null, null, BigDecimal.valueOf(3500), false);
+        var results = search("warm layer", null, null, null, BigDecimal.valueOf(65), false);
 
         assertThat(results.content())
                 .extracting(ProductSummaryResponse::sku)
                 .containsExactly("NIK-HD-001", "ADI-HD-001");
         assertThat(results.content())
                 .allSatisfy(p -> assertThat(p.price())
-                        .isLessThanOrEqualTo(BigDecimal.valueOf(3500)));
+                        .isLessThanOrEqualTo(BigDecimal.valueOf(65)));
     }
 
     @Test

@@ -53,18 +53,18 @@ class DemoDataInstallerTest {
     void createsTheFourDemoAccounts() {
         assertThat(userRepository.findAll())
                 .extracting(AppUser::getUsername)
-                .containsExactlyInAnyOrder("aditya", "priya", "rahul", "demo");
+                .containsExactlyInAnyOrder("satvik", "sarah", "rahul", "demo");
     }
 
     @Test
     void storesPasswordsAsBcryptHashesNotPlaintext() {
-        AppUser aditya = userRepository.findByUsername("aditya").orElseThrow();
+        AppUser satvik = userRepository.findByUsername("satvik").orElseThrow();
 
-        assertThat(aditya.getPasswordHash())
+        assertThat(satvik.getPasswordHash())
                 .isNotEqualTo("Password123")
                 .startsWith("$2");
-        assertThat(passwordEncoder.matches("Password123", aditya.getPasswordHash())).isTrue();
-        assertThat(passwordEncoder.matches("wrong", aditya.getPasswordHash())).isFalse();
+        assertThat(passwordEncoder.matches("Password123", satvik.getPasswordHash())).isTrue();
+        assertThat(passwordEncoder.matches("wrong", satvik.getPasswordHash())).isFalse();
     }
 
     @Test
@@ -87,8 +87,8 @@ class DemoDataInstallerTest {
 
     @Test
     void spreadsOrdersAcrossUsersAndStatuses() {
-        AppUser aditya = userRepository.findByUsername("aditya").orElseThrow();
-        List<Order> orders = orderRepository.findByUserIdOrderByPlacedAtDesc(aditya.getId());
+        AppUser satvik = userRepository.findByUsername("satvik").orElseThrow();
+        List<Order> orders = orderRepository.findByUserIdOrderByPlacedAtDesc(satvik.getId());
 
         assertThat(orders).hasSize(5);
         assertThat(orders).extracting(Order::getStatus)
@@ -100,25 +100,25 @@ class DemoDataInstallerTest {
 
     @Test
     void scopesOrderLookupToTheOwningUser() {
-        AppUser aditya = userRepository.findByUsername("aditya").orElseThrow();
+        AppUser satvik = userRepository.findByUsername("satvik").orElseThrow();
         AppUser rahul = userRepository.findByUsername("rahul").orElseThrow();
-        String adityasOrder = orderRepository
-                .findByUserIdOrderByPlacedAtDesc(aditya.getId()).getFirst().getOrderNumber();
+        String satviksOrder = orderRepository
+                .findByUserIdOrderByPlacedAtDesc(satvik.getId()).getFirst().getOrderNumber();
 
         // The owner sees it...
         assertThat(orderRepository.findByOrderNumberIgnoreCaseAndUserId(
-                adityasOrder, aditya.getId())).isPresent();
+                satviksOrder, satvik.getId())).isPresent();
 
         // ...and another signed-in user simply does not, which is the guarantee
         // the assistant's order tools will rely on in Phase 5.
         assertThat(orderRepository.findByOrderNumberIgnoreCaseAndUserId(
-                adityasOrder, rahul.getId())).isEmpty();
+                satviksOrder, rahul.getId())).isEmpty();
     }
 
     @Test
     void computesOrderTotalFromItsLines() {
-        AppUser priya = userRepository.findByUsername("priya").orElseThrow();
-        Order tees = orderRepository.findByUserIdOrderByPlacedAtDesc(priya.getId()).stream()
+        AppUser sarah = userRepository.findByUsername("sarah").orElseThrow();
+        Order tees = orderRepository.findByUserIdOrderByPlacedAtDesc(sarah.getId()).stream()
                 .filter(o -> o.getStatus() == OrderStatus.DELIVERED)
                 .findFirst()
                 .orElseThrow();
@@ -128,8 +128,8 @@ class DemoDataInstallerTest {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         assertThat(tees.getTotalAmount()).isEqualByComparingTo(expected);
-        // 3 x Uniqlo AIRism tee at 990
-        assertThat(tees.getTotalAmount()).isEqualByComparingTo("2970");
+        // 3 x Uniqlo AIRism tee at 19.90
+        assertThat(tees.getTotalAmount()).isEqualByComparingTo("59.70");
     }
 
     @Test

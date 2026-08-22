@@ -24,7 +24,7 @@ public record RagProperties(
         if (topK <= 0) {
             // Deliberately larger than the number of results ever shown. Hard
             // filters run after retrieval, so a query for "warm jacket under
-            // ₹3000" needs enough candidates that the price filter still leaves
+            // $80" needs enough candidates that the price filter still leaves
             // something behind.
             topK = 40;
         }

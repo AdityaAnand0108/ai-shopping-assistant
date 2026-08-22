@@ -129,7 +129,7 @@ class AuthEndpointsTest {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"username":"aditya","email":"different@example.com","password":"Sup3rSecret"}"""))
+                                {"username":"satvik","email":"different@example.com","password":"Sup3rSecret"}"""))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("Account already exists"));
     }
@@ -175,11 +175,11 @@ class AuthEndpointsTest {
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"username":"aditya","password":"Password123"}"""))
+                                {"username":"satvik","password":"Password123"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.expiresAt").isNotEmpty())
-                .andExpect(jsonPath("$.user.username").value("aditya"));
+                .andExpect(jsonPath("$.user.username").value("satvik"));
     }
 
     @Test
@@ -194,7 +194,7 @@ class AuthEndpointsTest {
         String wrongPassword = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"username":"priya","password":"NotThePassword1"}"""))
+                                {"username":"sarah","password":"NotThePassword1"}"""))
                 .andExpect(status().isUnauthorized())
                 .andReturn().getResponse().getContentAsString();
 
@@ -207,12 +207,12 @@ class AuthEndpointsTest {
         String payload = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"username":"priya","password":"NotThePassword1"}"""))
+                                {"username":"sarah","password":"NotThePassword1"}"""))
                 .andExpect(status().isUnauthorized())
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(payload)
-                .doesNotContain("priya")
+                .doesNotContain("sarah")
                 .doesNotContainIgnoringCase("no such user")
                 .doesNotContainIgnoringCase("incorrect password");
         assertThat(payload).contains("Invalid username or password");

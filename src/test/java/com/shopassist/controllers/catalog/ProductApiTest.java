@@ -81,7 +81,7 @@ class ProductApiTest {
         // matchers: JSON numbers arrive as Integer or Double depending on the
         // decimal scale, so a matcher typed to one of them fails on the other.
         String body = mockMvc.perform(get("/api/products")
-                        .param("minPrice", "500").param("maxPrice", "1200"))
+                        .param("minPrice", "20").param("maxPrice", "35"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -90,7 +90,7 @@ class ProductApiTest {
         assertThat(root.get("content").valueStream().toList())
                 .isNotEmpty()
                 .allSatisfy(item -> assertThat(item.get("price").decimalValue())
-                        .isBetween(new java.math.BigDecimal("500"), new java.math.BigDecimal("1200")));
+                        .isBetween(new java.math.BigDecimal("20"), new java.math.BigDecimal("35")));
     }
 
     @Test
@@ -134,7 +134,7 @@ class ProductApiTest {
         mockMvc.perform(get("/api/products")
                         .param("sort", "PRICE").param("size", "5"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].price").value(349.0));
+                .andExpect(jsonPath("$.content[0].price").value(12.99));
     }
 
     @Test

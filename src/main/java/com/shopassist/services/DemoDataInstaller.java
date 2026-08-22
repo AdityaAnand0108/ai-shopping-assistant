@@ -46,7 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class DemoDataInstaller {
 
-    private static final String CURRENCY = "INR";
+    private static final String CURRENCY = "USD";
     private static final int ORDER_NUMBER_START = 101;
     private static final Duration STEP = Duration.ofHours(18);
 
@@ -208,10 +208,10 @@ public class DemoDataInstaller {
 
     private static String shippingAddressFor(String username) {
         return switch (username) {
-            case "aditya" -> "14 Nehru Park Road, Koramangala, Bengaluru 560034";
-            case "priya" -> "302 Sunrise Apartments, Baner, Pune 411045";
-            case "rahul" -> "77 Salt Lake Sector V, Kolkata 700091";
-            default -> "1 Demo Street, Sample City 000001";
+            case "satvik" -> "1420 Bryant Street, Apt 3B, San Francisco, CA 94103";
+            case "sarah" -> "88 Larkspur Lane, Austin, TX 78704";
+            case "rahul" -> "515 Wabash Avenue, Unit 12, Chicago, IL 60611";
+            default -> "1 Demo Street, Sample City, NY 10001";
         };
     }
 
@@ -238,32 +238,32 @@ public class DemoDataInstaller {
     }
 
     private static final List<DemoUser> DEMO_USERS = List.of(
-            new DemoUser("aditya", "aditya@example.com", "Aditya Ambekar", "Password123"),
-            new DemoUser("priya", "priya@example.com", "Priya Nair", "Password123"),
+            new DemoUser("satvik", "satvik@example.com", "Satvik Vala", "Password123"),
+            new DemoUser("sarah", "sarah@example.com", "Sarah Mitchell", "Password123"),
             new DemoUser("rahul", "rahul@example.com", "Rahul Sharma", "Password123"),
             new DemoUser("demo", "demo@example.com", "Demo Shopper", "Demo1234")
     );
 
     private static final List<DemoOrder> DEMO_ORDERS = List.of(
-            new DemoOrder("aditya", OrderStatus.DELIVERED, 28,
+            new DemoOrder("satvik", OrderStatus.DELIVERED, 28,
                     List.of(new DemoLine("NIK-SH-001", 1), new DemoLine("NIK-TS-002", 2))),
-            new DemoOrder("aditya", OrderStatus.OUT_FOR_DELIVERY, 4,
+            new DemoOrder("satvik", OrderStatus.OUT_FOR_DELIVERY, 4,
                     List.of(new DemoLine("SNY-HP-001", 1))),
-            new DemoOrder("aditya", OrderStatus.SHIPPED, 6,
-                    List.of(new DemoLine("LEV-JN-001", 1), new DemoLine("JJ-TR-001", 1))),
-            new DemoOrder("aditya", OrderStatus.PLACED, 1,
+            new DemoOrder("satvik", OrderStatus.SHIPPED, 6,
+                    List.of(new DemoLine("LEV-JN-001", 1), new DemoLine("DOC-TR-001", 1))),
+            new DemoOrder("satvik", OrderStatus.PLACED, 1,
                     List.of(new DemoLine("BK-001", 1), new DemoLine("BK-002", 1))),
-            new DemoOrder("aditya", OrderStatus.RETURNED, 60,
-                    List.of(new DemoLine("FIR-WT-001", 1))),
+            new DemoOrder("satvik", OrderStatus.RETURNED, 60,
+                    List.of(new DemoLine("AMZ-WT-001", 1))),
 
-            new DemoOrder("priya", OrderStatus.DELIVERED, 15,
+            new DemoOrder("sarah", OrderStatus.DELIVERED, 15,
                     List.of(new DemoLine("UNQ-TS-001", 3))),
-            new DemoOrder("priya", OrderStatus.OUT_FOR_DELIVERY, 2,
-                    List.of(new DemoLine("PRE-KT-002", 1), new DemoLine("MIL-KT-001", 1))),
-            new DemoOrder("priya", OrderStatus.CONFIRMED, 1,
+            new DemoOrder("sarah", OrderStatus.OUT_FOR_DELIVERY, 2,
+                    List.of(new DemoLine("INP-KT-001", 1), new DemoLine("HYD-KT-001", 1))),
+            new DemoOrder("sarah", OrderStatus.CONFIRMED, 1,
                     List.of(new DemoLine("APL-WT-001", 1))),
 
             new DemoOrder("rahul", OrderStatus.CANCELLED, 10,
-                    List.of(new DemoLine("XIA-PH-001", 1)))
+                    List.of(new DemoLine("GOO-PH-001", 1)))
     );
 }

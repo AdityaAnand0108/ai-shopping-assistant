@@ -47,17 +47,17 @@ Built phase by phase. Current: **Phase 7 — guardrails, and a grounding check t
 ## Demo dataset
 
 The catalog is loaded from `src/main/resources/data/products.csv` — 60 products
-across apparel, footwear, electronics, home, sports and books. One item
-(`NIK-TS-004`) is deliberately out of stock so availability handling can be
-tested.
+across apparel, footwear, electronics, home, sports and books, priced in **US
+dollars** at plausible US retail. One item (`NIK-TS-004`) is deliberately out of
+stock so availability handling can be tested.
 
 Four accounts are seeded on first startup. Passwords are hashed with BCrypt; the
 plaintext below exists only so the demo is runnable.
 
 | Username | Password | Orders |
 |----------|----------|--------|
-| `aditya` | `Password123` | 5, spanning delivered, out for delivery, shipped, placed and returned |
-| `priya` | `Password123` | 3, including one out for delivery |
+| `satvik` | `Password123` | 5, spanning delivered, out for delivery, shipped, placed and returned |
+| `sarah` | `Password123` | 3, including one out for delivery |
 | `rahul` | `Password123` | 1, cancelled |
 | `demo` | `Demo1234` | none — exercises the empty state |
 
@@ -86,7 +86,7 @@ Everything tied to a person — chat, orders, profile — requires a token.
 Sign in and call a protected endpoint:
 
 ```bash
-curl -s -X POST http://localhost:8080/api/auth/login -H "Content-Type: application/json" -d "{\"username\":\"aditya\",\"password\":\"Password123\"}"
+curl -s -X POST http://localhost:8080/api/auth/login -H "Content-Type: application/json" -d "{\"username\":\"satvik\",\"password\":\"Password123\"}"
 ```
 
 ```bash
@@ -320,8 +320,8 @@ Catalog search is hybrid: retrieval decides which products a phrase is *about*,
 and SQL decides what may actually be shown.
 
 ```
-"gift for someone who runs"                → 2 running shoes
-"noise cancelling headphones for a flight" → all 4 headphones, Sony XM5 first
+"gift for someone who runs"                → running shoes
+"noise cancelling headphones for a flight" → headphones, Sony XM5 first
 "something to keep me warm"                → down jacket, fleece hoodie (plus noise)
 "I need to make tea and coffee"            → nothing
 ```
@@ -419,7 +419,7 @@ tools actually returned. Anything with no source is reported in `insight`:
 ```
 
 That is a real capture. The model reported a cancelled order as placed on
-2026-02-15 when it was placed in August — while correctly quoting ₹23,999.00,
+2026-02-15 when it was placed in August — while correctly quoting $499.00,
 which the check accepted. It flags the false claim and nothing else.
 
 **Flag, do not block.** An unsupported figure is usually a wrong number in an
@@ -461,7 +461,7 @@ caught by the backend**:
 |----------|---------|
 | Invented a SKU (`NIK-TL-001` for `NIK-TS-001`) | Rejected as unknown; no order |
 | Fabricated a draft reference (`ORD-2023-000001`) | Rejected; no order |
-| Quoted ₹2,499.99 when the tool returned ₹3,598.00 | Wrong number shown to the shopper |
+| Quoted $49.99.99 when the tool returned $69.98 | Wrong number shown to the shopper |
 | Claimed "we have 2 available" | Invented — no tool returns stock counts |
 | Reported an order placed on a date that was its ETA | Wrong date shown — **now flagged** |
 | Would not chain a second tool call to recover from an error | Purchase flow stalls |

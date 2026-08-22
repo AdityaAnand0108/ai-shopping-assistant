@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class ProductCsvLoader {
 
-    private static final String DEFAULT_CURRENCY = "INR";
+    private static final String DEFAULT_CURRENCY = "USD";
     private static final String IMAGE_URL_TEMPLATE = "https://picsum.photos/seed/%s/500/500";
 
     private final ResourceLoader resourceLoader;

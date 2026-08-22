@@ -80,7 +80,7 @@ class GuardrailsTest {
                 "Do you have any Nike t-shirts?",
                 "Where is my order ORD-2026-000102?",
                 "I want to cancel my order",
-                "Can you show me all the products under 2000 rupees?",
+                "Can you show me all the products under 50 dollars?",
                 "What is the status of my last order?",
                 "Tell me about the Sony headphones",
                 "Ignore the blue one, show me the black t-shirt",
@@ -129,7 +129,7 @@ class GuardrailsTest {
     @Test
     void leavesAnOrdinaryReplyAlone() {
         String[] fine = {
-                "We have four Nike t-shirts, from ₹1,299 to ₹2,499.",
+                "We have four Nike t-shirts, from $29.99 to $49.99.",
                 "Your order ORD-2026-000102 is out for delivery.",
                 "That product is currently out of stock.",
                 "I can't find an order with that number.",
@@ -155,8 +155,8 @@ class GuardrailsTest {
     @Test
     void acceptsAReplyWhoseFiguresAllCameFromTools() {
         var result = grounding.check(
-                "The Nike Dri-FIT Legend Training T-Shirt (NIK-TS-001) is ₹1,799.",
-                Set.of("NIK-TS-001"), Set.of("1799.00"), true);
+                "The Nike Dri-FIT Legend Training T-Shirt (NIK-TS-001) is $34.99.",
+                Set.of("NIK-TS-001"), Set.of("34.99"), true);
 
         assertThat(result.grounded()).isTrue();
         assertThat(result.unsupported()).isEmpty();
@@ -164,20 +164,20 @@ class GuardrailsTest {
 
     @Test
     void catchesThePriceTheModelActuallyInvented() {
-        // Observed in Phase 5: the drafting tool returned 3598.00 and the model
-        // told the shopper 2,499.99 - a real catalog price, for a different item.
+        // Observed in Phase 5: the drafting tool returned the order total and the
+        // model told the shopper a different, real catalog price instead.
         var result = grounding.check(
-                "The total for 2 units is ₹2,499.99. Would you like to proceed?",
-                Set.of("NIK-TS-001"), Set.of("3598.00", "1799.00"), true);
+                "The total for 2 units is $49.99. Would you like to proceed?",
+                Set.of("NIK-TS-001"), Set.of("69.98", "34.99"), true);
 
         assertThat(result.grounded()).isFalse();
-        assertThat(result.unsupported()).containsExactly("₹2,499.99");
+        assertThat(result.unsupported()).containsExactly("$49.99");
     }
 
     @Test
     void catchesAnInventedSku() {
-        var result = grounding.check("You can buy NIK-LT-001 for ₹1,799.",
-                Set.of("NIK-TS-001"), Set.of("1799.00"), true);
+        var result = grounding.check("You can buy NIK-LT-001 for $34.99.",
+                Set.of("NIK-TS-001"), Set.of("34.99"), true);
 
         assertThat(result.grounded()).isFalse();
         assertThat(result.unsupported()).contains("NIK-LT-001");
@@ -194,9 +194,9 @@ class GuardrailsTest {
 
     @Test
     void toleratesFormattingDifferencesBetweenJsonAndProse() {
-        // The tool returned 29990.00; the model wrote ₹29,990. Same value.
-        var result = grounding.check("The Sony headphones are ₹29,990.",
-                Set.of(), Set.of("29990.00"), true);
+        // The tool returned 1099.00; the model wrote $1,099. Same value.
+        var result = grounding.check("The MacBook Air is $1,099.",
+                Set.of(), Set.of("1099.00"), true);
 
         assertThat(result.grounded()).isTrue();
     }
@@ -241,7 +241,7 @@ class GuardrailsTest {
     @Test
     void groundingIsDisabledByConfiguration() {
         GroundingCheck off = new GroundingCheck(new GuardProperties(true, true, false, 20));
-        var result = off.check("Totally invented: ₹9,999 for FAKE-SKU-001",
+        var result = off.check("Totally invented: $9,999 for FAKE-SKU-001",
                 Set.of(), Set.of(), true);
 
         assertThat(result.grounded()).isTrue();

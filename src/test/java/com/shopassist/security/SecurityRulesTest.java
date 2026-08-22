@@ -92,9 +92,9 @@ class SecurityRulesTest {
         JwtProperties attackerProperties = new JwtProperties(
                 "an-entirely-different-signing-key-of-sufficient-length", null, "shop-assistant");
         JwtService attackerService = new JwtService(attackerProperties);
-        AppUser aditya = userRepository.findByUsername("aditya").orElseThrow();
+        AppUser satvik = userRepository.findByUsername("satvik").orElseThrow();
 
-        String forged = attackerService.issue(aditya).token();
+        String forged = attackerService.issue(satvik).token();
 
         mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + forged))
                 .andExpect(status().isUnauthorized());
@@ -104,9 +104,9 @@ class SecurityRulesTest {
     void aTokenFromAnotherIssuerIsRefused() throws Exception {
         JwtProperties otherIssuer = new JwtProperties(
                 JwtProperties.DEVELOPMENT_SECRET, null, "some-other-service");
-        AppUser aditya = userRepository.findByUsername("aditya").orElseThrow();
+        AppUser satvik = userRepository.findByUsername("satvik").orElseThrow();
 
-        String token = new JwtService(otherIssuer).issue(aditya).token();
+        String token = new JwtService(otherIssuer).issue(satvik).token();
 
         mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
@@ -124,9 +124,9 @@ class SecurityRulesTest {
     void anExpiredTokenIsRefused() throws Exception {
         JwtProperties instantlyExpiring = new JwtProperties(
                 JwtProperties.DEVELOPMENT_SECRET, java.time.Duration.ofSeconds(-10), "shop-assistant");
-        AppUser aditya = userRepository.findByUsername("aditya").orElseThrow();
+        AppUser satvik = userRepository.findByUsername("satvik").orElseThrow();
 
-        String expired = new JwtService(instantlyExpiring).issue(aditya).token();
+        String expired = new JwtService(instantlyExpiring).issue(satvik).token();
 
         mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + expired))
                 .andExpect(status().isUnauthorized());
@@ -134,39 +134,39 @@ class SecurityRulesTest {
 
     @Test
     void tokenSubjectCarriesThePublicRefNotTheDatabaseKey() {
-        AppUser aditya = userRepository.findByUsername("aditya").orElseThrow();
+        AppUser satvik = userRepository.findByUsername("satvik").orElseThrow();
 
         JwtService.VerifiedToken verified =
-                jwtService.verify(jwtService.issue(aditya).token()).orElseThrow();
+                jwtService.verify(jwtService.issue(satvik).token()).orElseThrow();
 
-        assertThat(verified.publicRef()).isEqualTo(aditya.getPublicRef());
-        assertThat(verified.publicRef()).isNotEqualTo(String.valueOf(aditya.getId()));
+        assertThat(verified.publicRef()).isEqualTo(satvik.getPublicRef());
+        assertThat(verified.publicRef()).isNotEqualTo(String.valueOf(satvik.getId()));
     }
 
     // --- disabled accounts and revocation -----------------------------------
 
     @Test
     void disablingAnAccountInvalidatesTokensAlreadyIssuedToIt() throws Exception {
-        String token = tokenFor("priya", "Password123");
+        String token = tokenFor("sarah", "Password123");
 
         mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
 
-        AppUser priya = userRepository.findByUsername("priya").orElseThrow();
-        priya.setEnabled(false);
-        userRepository.save(priya);
+        AppUser sarah = userRepository.findByUsername("sarah").orElseThrow();
+        sarah.setEnabled(false);
+        userRepository.save(sarah);
 
         // The token is still cryptographically valid; the account behind it is not.
         mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
 
-        priya.setEnabled(true);
-        userRepository.save(priya);
+        sarah.setEnabled(true);
+        userRepository.save(sarah);
     }
 
     @Test
     void logoutRevokesTheTokenItWasCalledWith() throws Exception {
-        String token = tokenFor("aditya", "Password123");
+        String token = tokenFor("satvik", "Password123");
 
         mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
@@ -180,8 +180,8 @@ class SecurityRulesTest {
 
     @Test
     void revokingOneTokenLeavesTheSameUsersOtherSessionsWorking() throws Exception {
-        String laptop = tokenFor("aditya", "Password123");
-        String phone = tokenFor("aditya", "Password123");
+        String laptop = tokenFor("satvik", "Password123");
+        String phone = tokenFor("satvik", "Password123");
         assertThat(laptop).isNotEqualTo(phone);
 
         mockMvc.perform(post("/api/auth/logout").header("Authorization", "Bearer " + laptop))
@@ -195,18 +195,18 @@ class SecurityRulesTest {
 
     @Test
     void eachUsersTokenResolvesToTheirOwnIdentityOnly() throws Exception {
-        String adityasToken = tokenFor("aditya", "Password123");
-        String priyasToken = tokenFor("priya", "Password123");
+        String satviksToken = tokenFor("satvik", "Password123");
+        String sarahsToken = tokenFor("sarah", "Password123");
 
-        mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + adityasToken))
-                .andExpect(jsonPath("$.username").value("aditya"));
-        mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + priyasToken))
-                .andExpect(jsonPath("$.username").value("priya"));
+        mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + satviksToken))
+                .andExpect(jsonPath("$.username").value("satvik"));
+        mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + sarahsToken))
+                .andExpect(jsonPath("$.username").value("sarah"));
     }
 
     @Test
     void profileNeverLeaksTheHashOrInternalCounters() throws Exception {
-        String token = tokenFor("aditya", "Password123");
+        String token = tokenFor("satvik", "Password123");
 
         String payload = mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", "Bearer " + token))

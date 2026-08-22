@@ -15,12 +15,12 @@ import java.util.regex.Pattern;
  * Checks a reply against the evidence the tools actually returned.
  *
  * <p>This exists because of something observed in testing rather than imagined.
- * Asked to buy two t-shirts, the model called the drafting tool, received a
- * total of ₹3,598.00, and then told the shopper ₹2,499.99 — a real price from
- * the catalog, for a different shirt. Tool calling guarantees the <em>action</em>
- * was correct; it guarantees nothing about the sentence wrapped around it. On
- * another turn the model reported "we have 2 available", a stock count no tool
- * returns at all.
+ * Asked to buy two t-shirts, the model called the drafting tool, received the
+ * correct order total, and then quoted the shopper a different figure entirely —
+ * a real price from the catalog, for another shirt. Tool calling guarantees the
+ * <em>action</em> was correct; it guarantees nothing about the sentence wrapped
+ * around it. On another turn the model reported "we have 2 available", a stock
+ * count no tool returns at all.
  *
  * <p>So every identifier and amount in the reply is compared against what the
  * tools produced. Anything with no source is unsupported.
@@ -54,14 +54,14 @@ public class GroundingCheck {
     private static final Pattern ISO_DATE = Pattern.compile("\\b\\d{4}-\\d{2}-\\d{2}\\b");
 
     /**
-     * Money as a shopper sees it: ₹1,299 or ₹3,598.00 or Rs. 1799.
+     * Money as a shopper sees it: $34.99 or $1,099 or USD 69.98.
      *
      * <p>Only currency-marked numbers count. A bare number in prose is usually a
      * quantity or a date, and treating those as price claims would flag almost
      * every reply.
      */
     private static final Pattern MONEY = Pattern.compile(
-            "(?:₹|\\bRs\\.?\\s?|\\bINR\\s?)\\s*([\\d,]+(?:\\.\\d{1,2})?)");
+            "(?:\\$|\\bUSD\\s?)\\s*([\\d,]+(?:\\.\\d{1,2})?)");
 
     private final GuardProperties properties;
 
@@ -98,7 +98,7 @@ public class GroundingCheck {
         while (money.find()) {
             String normalised = money.group(1).replace(",", "");
             if (!matchesAny(normalised, supportedNums)) {
-                unsupported.add("₹" + money.group(1));
+                unsupported.add("$" + money.group(1));
             }
         }
 
@@ -120,7 +120,7 @@ public class GroundingCheck {
 
     /**
      * Tolerates formatting differences between a JSON figure and prose. A tool
-     * returning {@code 1799.00} supports "₹1,799"; the comparison is on value,
+     * returning {@code 1099.00} supports "$1,099"; the comparison is on value,
      * not on text.
      */
     private static boolean matchesAny(String claimed, Set<String> supported) {

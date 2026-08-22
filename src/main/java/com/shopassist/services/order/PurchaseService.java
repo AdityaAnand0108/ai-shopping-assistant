@@ -49,7 +49,7 @@ public class PurchaseService {
     /** Most distinct products in a single order. */
     static final int MAX_LINES = 10;
 
-    private static final String CURRENCY = "INR";
+    private static final String CURRENCY = "USD";
     private static final int DELIVERY_DAYS = 6;
 
     private final ProductRepository productRepository;

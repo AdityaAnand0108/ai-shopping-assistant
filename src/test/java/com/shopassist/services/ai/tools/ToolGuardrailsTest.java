@@ -97,7 +97,7 @@ class ToolGuardrailsTest {
 
     @Test
     void searchProductsAnswersTheBriefsNikeQuestion() {
-        signIn("aditya");
+        signIn("satvik");
         var result = catalogTools.searchProducts("t-shirt", "Nike", null, null, null, null);
 
         assertThat(result.matches()).hasSize(4);
@@ -107,7 +107,7 @@ class ToolGuardrailsTest {
 
     @Test
     void searchResultsNeverCarryAStockCount() {
-        signIn("aditya");
+        signIn("satvik");
         var result = catalogTools.searchProducts(null, "Nike", null, null, null, null);
 
         // Availability is a band. If a raw count reached the model it would end
@@ -121,7 +121,7 @@ class ToolGuardrailsTest {
 
     @Test
     void searchIsCappedSoOneCallCannotDrainTheCatalog() {
-        signIn("aditya");
+        signIn("satvik");
         var result = catalogTools.searchProducts(null, null, null, null, null, null);
 
         assertThat(result.returned()).isLessThanOrEqualTo(8);
@@ -130,7 +130,7 @@ class ToolGuardrailsTest {
 
     @Test
     void checkStockAnswersYesOrNoWithoutRevealingTheNumber() {
-        signIn("aditya");
+        signIn("satvik");
 
         assertThat(catalogTools.checkStock("NIK-TS-001", 5).available()).isTrue();
         assertThat(catalogTools.checkStock("NIK-TS-001", 5000).available()).isFalse();
@@ -143,7 +143,7 @@ class ToolGuardrailsTest {
 
     @Test
     void anInventedSkuIsReportedAsUnknownRatherThanUnavailable() {
-        signIn("aditya");
+        signIn("satvik");
 
         // The failure mode this prevents: the model invents a plausible SKU, the
         // tool says "not available", and the shopper is told a real-sounding
@@ -158,7 +158,7 @@ class ToolGuardrailsTest {
 
     @Test
     void listMyOrdersReturnsOnlyTheSignedInShoppersOrders() {
-        signIn("aditya");
+        signIn("satvik");
         assertThat(orderTools.listMyOrders()).hasSize(5);
 
         signIn("rahul");
@@ -170,21 +170,21 @@ class ToolGuardrailsTest {
 
     @Test
     void theModelCannotReachAnotherShoppersOrderEvenWithItsRealNumber() {
-        signIn("aditya");
-        String adityasOrder = orderTools.listMyOrders().getFirst().orderNumber();
-        assertThat(orderTools.getOrderStatus(adityasOrder)).isNotNull();
+        signIn("satvik");
+        String satviksOrder = orderTools.listMyOrders().getFirst().orderNumber();
+        assertThat(orderTools.getOrderStatus(satviksOrder)).isNotNull();
 
         // Same tool, same real order number, different signed-in shopper.
         signIn("rahul");
-        assertThatThrownBy(() -> orderTools.getOrderStatus(adityasOrder))
+        assertThatThrownBy(() -> orderTools.getOrderStatus(satviksOrder))
                 .isInstanceOf(ResourceNotFoundException.class);
-        assertThatThrownBy(() -> orderTools.getDeliveryEstimate(adityasOrder))
+        assertThatThrownBy(() -> orderTools.getDeliveryEstimate(satviksOrder))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void deliveryEstimateComesFromRecordedFactsNotGuesswork() {
-        signIn("aditya");
+        signIn("satvik");
         String outForDelivery = orderTools.listMyOrders().stream()
                 .filter(o -> o.status() == OrderStatus.OUT_FOR_DELIVERY)
                 .findFirst().orElseThrow().orderNumber();
@@ -217,7 +217,7 @@ class ToolGuardrailsTest {
         var draft = purchaseTools.createOrderDraft("NIK-TS-001:2");
 
         assertThat(draft.draftReference()).isNotBlank();
-        assertThat(draft.total()).isEqualByComparingTo("3598");
+        assertThat(draft.total()).isEqualByComparingTo("69.98");
         assertThat(draft.nextStep()).contains("Nothing has been bought yet");
 
         // The decisive assertion: after drafting, the shopper still has no orders.
@@ -233,7 +233,7 @@ class ToolGuardrailsTest {
 
         assertThat(placed.orderNumber()).startsWith("ORD-");
         assertThat(placed.status()).isEqualTo(OrderStatus.PLACED);
-        assertThat(placed.total()).isEqualByComparingTo("4197");
+        assertThat(placed.total()).isEqualByComparingTo("86.97");
         assertThat(orderTools.listMyOrders()).hasSize(1);
     }
 
@@ -352,7 +352,7 @@ class ToolGuardrailsTest {
 
     @Test
     void cancelsAnOrderThatHasNotShipped() {
-        signIn("aditya");
+        signIn("satvik");
         String placed = orderTools.listMyOrders().stream()
                 .filter(o -> o.status() == OrderStatus.PLACED)
                 .findFirst().orElseThrow().orderNumber();
@@ -365,7 +365,7 @@ class ToolGuardrailsTest {
 
     @Test
     void refusesToCancelADeliveredOrder() {
-        signIn("aditya");
+        signIn("satvik");
         String delivered = orderTools.listMyOrders().stream()
                 .filter(o -> o.status() == OrderStatus.DELIVERED)
                 .findFirst().orElseThrow().orderNumber();
@@ -377,13 +377,13 @@ class ToolGuardrailsTest {
 
     @Test
     void aShopperCannotCancelAnotherShoppersOrder() {
-        signIn("aditya");
-        String adityasOrder = orderTools.listMyOrders().stream()
+        signIn("satvik");
+        String satviksOrder = orderTools.listMyOrders().stream()
                 .filter(o -> o.status() == OrderStatus.PLACED)
                 .findFirst().orElseThrow().orderNumber();
 
         signIn("rahul");
-        assertThatThrownBy(() -> purchaseTools.cancelOrder(adityasOrder))
+        assertThatThrownBy(() -> purchaseTools.cancelOrder(satviksOrder))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
