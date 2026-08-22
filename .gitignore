@@ -1,0 +1,28 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### IDE ###
+.idea/
+*.iml
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+
+### Runtime data ###
+data/
+*.log
+*.db
+*.mv.db
+*.trace.db
+
+### Env ###
+.env
+.env.local
+
+### Frontend (phase 9) ###
+node_modules/
+dist/
