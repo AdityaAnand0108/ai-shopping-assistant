@@ -14,7 +14,7 @@ Runs entirely on free, local tooling. No paid APIs, no cloud infrastructure.
 
 ## Status
 
-Built phase by phase. Current: **Phase 7 — guardrails, and a grounding check that catches the model inventing facts.**
+Built phase by phase. Current: **Phase 10 — React frontend.**
 
 | Phase | Scope | Status |
 |-------|-------|--------|
@@ -26,9 +26,9 @@ Built phase by phase. Current: **Phase 7 — guardrails, and a grounding check t
 | 5 | Tool calling (search, orders, draft→confirm purchase) | ✅ Done |
 | 6 | RAG over the product catalog | ✅ Done |
 | 7 | Guardrails and scope enforcement | ✅ Done |
-| 8 | Governance: audit, explainability, feedback, eval | ⬜ Next |
-| 9 | Streaming and hardening | ⬜ |
-| 10 | React frontend | ⬜ |
+| 8 | Governance: audit, feedback, eval | ⏭️ Deferred — see limitations |
+| 9 | Streaming and hardening | ⏭️ Deferred |
+| 10 | React frontend | ⬜ In progress |
 | 11 | Docs, architecture, limitations note | ⬜ |
 
 ## Tech stack
@@ -486,6 +486,17 @@ prose around them is.
   because of code, not because of the prompt.
 - **Retrieval quality is limited by the embedding model.** See the RAG section.
 - **Latency is 1–11 seconds** per reply on CPU, longer when tools are called.
+- **Feedback handling is not implemented.** The brief asks for it by name, and it
+  is absent: there is no endpoint for a shopper to mark an answer good or bad.
+  The groundwork exists — every chat message carries a public reference precisely
+  so feedback could hang off it — but the endpoint and table were not built.
+- **Accuracy is described, not measured.** The failures listed above were
+  observed by hand rather than scored against a fixed question set, so there is
+  no figure for how often the assistant picks the right tool or produces an
+  ungrounded answer. The grounding check reports this per turn; nothing
+  aggregates it.
+- **No response streaming.** A reply arrives all at once after several seconds
+  rather than token by token, which makes the assistant feel slower than it is.
 - **Semantic ranking is noisy in the middle.** "Something to keep me warm"
   returns a down jacket and a fleece hoodie, but also a training tee and a vacuum
   flask, because those genuinely score above the threshold. A larger embedding
