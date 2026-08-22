@@ -55,6 +55,12 @@ logging:
 
 # Application-specific settings (expanded in later phases)
 shopassist:
+  jwt:
+    # Development default. Override with SHOPASSIST_JWT_SECRET anywhere real;
+    # the application logs a warning while this value is in use.
+    secret: ${SHOPASSIST_JWT_SECRET:dev-only-insecure-signing-key-replace-me-in-any-real-deployment}
+    access-token-ttl: 60m
+    issuer: shop-assistant
   seed:
     enabled: true
     products-csv: classpath:data/products.csv

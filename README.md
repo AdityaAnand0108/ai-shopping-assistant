@@ -14,14 +14,14 @@ Runs entirely on free, local tooling. No paid APIs, no cloud infrastructure.
 
 ## Status
 
-Built phase by phase. Current: **Phase 1 — domain model and demo dataset complete.**
+Built phase by phase. Current: **Phase 2 — authentication complete.**
 
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 0 | Project scaffold, build, config profiles | ✅ Done |
 | 1 | Domain model, migrations, CSV seed data | ✅ Done |
-| 2 | Auth: signup, login, BCrypt, JWT security chain | ⬜ Next |
-| 3 | Deterministic REST API, scoped to the signed-in user | ⬜ |
+| 2 | Auth: signup, login, BCrypt, JWT security chain | ✅ Done |
+| 3 | Deterministic REST API, scoped to the signed-in user | ⬜ Next |
 | 4 | Ollama + Spring AI wiring, plain chat | ⬜ |
 | 5 | Tool calling (search, orders, draft→confirm purchase) | ⬜ |
 | 6 | RAG over the product catalog | ⬜ |
@@ -67,6 +67,70 @@ other's order number is how the cross-account guardrail gets demonstrated.
 Seeding is idempotent — each section is skipped when its table already has rows,
 so restarting against the file database does not duplicate anything. To start
 over, stop the app and delete the `data/` directory.
+
+## Authentication
+
+Stateless JWT in an `Authorization: Bearer <token>` header. Tokens last 60
+minutes; there is no refresh token, so a shopper signs in again when one expires.
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `POST` | `/api/auth/signup` | — | Register and sign in immediately |
+| `POST` | `/api/auth/login` | — | Exchange credentials for a token |
+| `GET` | `/api/auth/me` | ✅ | The signed-in account |
+| `POST` | `/api/auth/logout` | ✅ | Revoke the token used for the request |
+
+Browsing the catalog (`GET /api/products/**`), health and the API docs stay open.
+Everything tied to a person — chat, orders, profile — requires a token.
+
+Sign in and call a protected endpoint:
+
+```bash
+curl -s -X POST http://localhost:8080/api/auth/login -H "Content-Type: application/json" -d "{\"username\":\"aditya\",\"password\":\"Password123\"}"
+```
+
+```bash
+curl -s http://localhost:8080/api/auth/me -H "Authorization: Bearer PASTE_TOKEN_HERE"
+```
+
+### How it is protected
+
+- Passwords are BCrypt hashed and never appear in a response or a log line. The
+  signup DTO caps them at 72 characters because BCrypt ignores anything beyond
+  that, and silently truncating would weaken the hash without saying so.
+- The token's `sub` is the account's random `public_ref`, never the database
+  primary key, so a leaked token reveals nothing about how many accounts exist.
+- The user row is re-read on every request rather than trusted from the token
+  body, so disabling an account takes effect at once instead of waiting out the
+  token's remaining lifetime.
+- Five failed sign-ins lock an account for 15 minutes.
+- Unknown username and wrong password return a byte-identical response, and a
+  miss still runs one BCrypt comparison so response timing does not separate the
+  two either.
+- Every error leaves through one handler that emits RFC 7807 problem documents,
+  so no stack trace, SQL fragment or constraint name can reach a client.
+
+### Configuration
+
+Signing uses a development key checked into `application.yml`, which the
+application warns about on every startup. Override it anywhere real:
+
+```bash
+SHOPASSIST_JWT_SECRET="a-long-random-secret-of-at-least-32-bytes"
+```
+
+### Known limitations
+
+- **Revocation is in memory.** Logout works by denylisting the token id until it
+  would have expired anyway, so revocations are lost on restart and are not
+  shared between instances. Fine for a single-node POC; a scaled deployment would
+  move the denylist to Redis with a TTL equal to the token lifetime — the same
+  interface, a different backing store.
+- **Signup and lockout confirm that an account exists.** A taken username has to
+  be reported so the user can pick another, and a locked-out user has to be told
+  why. Login itself gives nothing away; these two paths are a deliberate trade of
+  a little enumeration exposure for a usable product.
+- **No refresh token.** A 60-minute session ends with a fresh sign-in.
 
 The default `dev` profile runs H2 in **MySQL compatibility mode**, so a single set
 of Flyway migrations works against both H2 and a real MySQL server. This keeps a

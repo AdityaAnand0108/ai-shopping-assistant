@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -31,12 +30,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest
 @ActiveProfiles("test")
-@TestPropertySource(properties = "shopassist.seed.enabled=true")
 @Transactional
-class DataSeederTest {
+class DemoDataInstallerTest {
 
     @Autowired
-    private DataSeeder seeder;
+    private DemoDataInstaller installer;
 
     @Autowired
     private AppUserRepository userRepository;
@@ -49,7 +47,7 @@ class DataSeederTest {
 
     @BeforeEach
     void seed() {
-        seeder.run(null);
+        installer.install();
     }
 
     @Test
@@ -176,7 +174,7 @@ class DataSeederTest {
         long usersAfterFirstRun = userRepository.count();
         long ordersAfterFirstRun = orderRepository.count();
 
-        seeder.run(null);
+        installer.install();
 
         assertThat(userRepository.count()).isEqualTo(usersAfterFirstRun);
         assertThat(orderRepository.count()).isEqualTo(ordersAfterFirstRun);
