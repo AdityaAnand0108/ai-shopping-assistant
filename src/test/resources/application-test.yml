@@ -7,3 +7,8 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password: ""
+
+# Each test class owns its fixtures; no demo data is loaded automatically.
+shopassist:
+  seed:
+    enabled: false

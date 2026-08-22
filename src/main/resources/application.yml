@@ -55,6 +55,10 @@ logging:
 
 # Application-specific settings (expanded in later phases)
 shopassist:
+  seed:
+    enabled: true
+    products-csv: classpath:data/products.csv
+    demo-password: Password123
   rag:
     store-path: ./data/vector-store.json
     top-k: 6

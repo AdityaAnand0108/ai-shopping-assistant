@@ -14,21 +14,22 @@ Runs entirely on free, local tooling. No paid APIs, no cloud infrastructure.
 
 ## Status
 
-Built phase by phase. Current: **Phase 0 — scaffold complete.**
+Built phase by phase. Current: **Phase 1 — domain model and demo dataset complete.**
 
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 0 | Project scaffold, build, config profiles | ✅ Done |
-| 1 | Domain model, migrations, CSV seed data | ⬜ Next |
-| 2 | Deterministic REST API (no AI) | ⬜ |
-| 3 | Ollama + Spring AI wiring, plain chat | ⬜ |
-| 4 | Tool calling (search, orders, draft→confirm purchase) | ⬜ |
-| 5 | RAG over the product catalog | ⬜ |
-| 6 | Guardrails and scope enforcement | ⬜ |
-| 7 | Governance: audit, explainability, feedback, eval | ⬜ |
-| 8 | Streaming and hardening | ⬜ |
-| 9 | React frontend | ⬜ |
-| 10 | Docs, architecture, limitations note | ⬜ |
+| 1 | Domain model, migrations, CSV seed data | ✅ Done |
+| 2 | Auth: signup, login, BCrypt, JWT security chain | ⬜ Next |
+| 3 | Deterministic REST API, scoped to the signed-in user | ⬜ |
+| 4 | Ollama + Spring AI wiring, plain chat | ⬜ |
+| 5 | Tool calling (search, orders, draft→confirm purchase) | ⬜ |
+| 6 | RAG over the product catalog | ⬜ |
+| 7 | Guardrails and scope enforcement | ⬜ |
+| 8 | Governance: audit, explainability, feedback, eval | ⬜ |
+| 9 | Streaming and hardening | ⬜ |
+| 10 | React frontend | ⬜ |
+| 11 | Docs, architecture, limitations note | ⬜ |
 
 ## Tech stack
 
@@ -41,7 +42,31 @@ Built phase by phase. Current: **Phase 0 — scaffold complete.**
 | Vector store | Spring AI `SimpleVectorStore`, file-persisted |
 | Database | H2 file (default) or MySQL 8 (`mysql` profile) |
 | Migrations | Flyway |
-| Frontend | React + Vite + TypeScript (Phase 9) |
+| Frontend | React + Vite + TypeScript (Phase 10) |
+
+## Demo dataset
+
+The catalog is loaded from `src/main/resources/data/products.csv` — 60 products
+across apparel, footwear, electronics, home, sports and books. One item
+(`NIK-TS-004`) is deliberately out of stock so availability handling can be
+tested.
+
+Four accounts are seeded on first startup. Passwords are hashed with BCrypt; the
+plaintext below exists only so the demo is runnable.
+
+| Username | Password | Orders |
+|----------|----------|--------|
+| `aditya` | `Password123` | 5, spanning delivered, out for delivery, shipped, placed and returned |
+| `priya` | `Password123` | 3, including one out for delivery |
+| `rahul` | `Password123` | 1, cancelled |
+| `demo` | `Demo1234` | none — exercises the empty state |
+
+Two accounts hold real orders on purpose: signing in as one and asking about the
+other's order number is how the cross-account guardrail gets demonstrated.
+
+Seeding is idempotent — each section is skipped when its table already has rows,
+so restarting against the file database does not duplicate anything. To start
+over, stop the app and delete the `data/` directory.
 
 The default `dev` profile runs H2 in **MySQL compatibility mode**, so a single set
 of Flyway migrations works against both H2 and a real MySQL server. This keeps a

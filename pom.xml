@@ -86,6 +86,14 @@
             <version>5.9</version>
         </dependency>
 
+        <!-- BCrypt for seeded credentials. The standalone crypto module rather
+             than the full security starter: it registers no filter chain, so
+             HTTP stays open until Phase 2 wires security deliberately. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
         <!-- Tooling -->
         <dependency>
             <groupId>org.projectlombok</groupId>
