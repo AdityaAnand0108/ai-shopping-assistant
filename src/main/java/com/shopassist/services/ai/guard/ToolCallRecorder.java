@@ -65,9 +65,24 @@ public class ToolCallRecorder {
         this.objectMapper = objectMapper;
     }
 
-    /** Opens a recording window for one chat turn. */
-    public void startTurn() {
-        current.set(new Turn());
+    /**
+     * Opens a recording window for one chat turn.
+     *
+     * @param conversationRef the thread this turn belongs to. Carried here so a
+     *                        tool can scope what it does to this conversation
+     *                        without the model having to pass an identifier it
+     *                        would get wrong.
+     */
+    public void startTurn(String conversationRef) {
+        Turn turn = new Turn();
+        turn.conversationRef = conversationRef;
+        current.set(turn);
+    }
+
+    /** The conversation this turn belongs to, or null outside a chat turn. */
+    public String conversationRef() {
+        Turn turn = current.get();
+        return turn == null ? null : turn.conversationRef;
     }
 
     /** Closes the window. Must run in a finally block, or state leaks between
@@ -136,6 +151,42 @@ public class ToolCallRecorder {
         return turn == null ? Set.of() : Set.copyOf(turn.amounts);
     }
 
+    /**
+     * Notes the draft a purchase tool priced this turn.
+     *
+     * <p>Recorded separately from the generic fact scan because the client needs
+     * the reference itself, not merely to know one appeared: it is what a
+     * Confirm button posts back. Extracting it from the serialised result would
+     * mean pattern-matching a UUID out of arbitrary JSON, which is guesswork
+     * where an explicit call is not.
+     */
+    public void noteDraft(String reference) {
+        Turn turn = current.get();
+        if (turn != null) {
+            turn.draftReference = reference;
+        }
+    }
+
+    /** Notes an order a purchase tool actually placed this turn. */
+    public void noteOrder(String orderNumber) {
+        Turn turn = current.get();
+        if (turn != null) {
+            turn.placedOrderNumber = orderNumber;
+        }
+    }
+
+    /** The draft priced this turn, or null. */
+    public String draftReference() {
+        Turn turn = current.get();
+        return turn == null ? null : turn.draftReference;
+    }
+
+    /** The order placed this turn, or null. */
+    public String placedOrderNumber() {
+        Turn turn = current.get();
+        return turn == null ? null : turn.placedOrderNumber;
+    }
+
     public boolean anyToolRan() {
         Turn turn = current.get();
         return turn != null && !turn.toolNames.isEmpty();
@@ -152,5 +203,8 @@ public class ToolCallRecorder {
         private final List<String> toolNames = new ArrayList<>();
         private final Set<String> facts = new LinkedHashSet<>();
         private final Set<String> amounts = new LinkedHashSet<>();
+        private String conversationRef;
+        private String draftReference;
+        private String placedOrderNumber;
     }
 }

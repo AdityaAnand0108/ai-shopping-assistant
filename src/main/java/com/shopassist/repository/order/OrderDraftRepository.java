@@ -30,4 +30,17 @@ public interface OrderDraftRepository extends JpaRepository<OrderDraft, Long> {
      */
     @EntityGraph(attributePaths = {"items", "items.product"})
     Optional<OrderDraft> findFirstByUserIdOrderByIdDesc(Long userId);
+
+    /**
+     * The shopper's most recent draft <em>within one conversation</em>.
+     *
+     * <p>The conversation in the signature does the same job the owner does:
+     * "most recent draft" is the right answer inside a thread and the wrong one
+     * across two. Without it, a draft left pending in an earlier conversation is
+     * the newest draft everywhere, and a shopper agreeing to a purchase in a
+     * later one confirms that instead.
+     */
+    @EntityGraph(attributePaths = {"items", "items.product"})
+    Optional<OrderDraft> findFirstByUserIdAndConversationRefOrderByIdDesc(
+            Long userId, String conversationRef);
 }

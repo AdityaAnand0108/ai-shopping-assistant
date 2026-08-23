@@ -172,6 +172,48 @@ curl -s "http://localhost:8080/api/products?q=t-shirt&brand=Nike&inStockOnly=tru
 No path carries a user identifier. Whose orders these are comes from the token,
 so there is no URL to edit to reach somebody else's.
 
+### Purchases — requires a token
+
+Checkout is two calls, and that is the point. The first prices a basket and
+creates nothing; the second is the only one that places an order.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/api/purchases/draft` | Price a basket. Creates no order |
+| `POST` | `/api/purchases/{reference}/confirm` | Place the order for a priced basket |
+| `DELETE` | `/api/purchases/{reference}` | Abandon a priced basket |
+
+The draft request carries SKUs and quantities and **no prices** — the server
+prices the basket from the catalog, and the response is what the shopper is
+shown before confirming. A checkout that accepted a total from the browser
+would be one edited request away from a free order.
+
+```bash
+curl -s -X POST http://localhost:8080/api/purchases/draft -H "Authorization: Bearer PASTE_TOKEN_HERE" -H "Content-Type: application/json" -d "{\"items\":[{\"sku\":\"SNY-HP-001\",\"quantity\":2}]}"
+```
+
+Confirming re-reads prices and stock rather than trusting the draft, because a
+quote taken minutes ago is not a promise the shop can still keep. A draft holds
+for 15 minutes; confirming a lapsed one is refused rather than silently
+repriced. Confirming the same draft twice returns the order that already
+exists, so a double-clicked button cannot buy twice.
+
+`confirmOrder` is scoped to the conversation it is called in. It takes no
+arguments — the model cannot carry a reference across turns without getting it
+wrong — so it resolves the shopper's most recent draft, which is the right
+answer inside one thread and the wrong one across two. A draft left unconfirmed
+in an earlier conversation was the newest draft everywhere, so agreeing to a
+purchase in a later conversation could confirm the earlier one instead: a
+different product, at a different price, never mentioned in the thread the
+shopper was reading. Drafts now carry the conversation they were proposed in
+(`V6__order_draft_conversation.sql`), and confirmation is filtered by it. Drafts
+made from the checkout page carry none, and are confirmed by reference.
+
+This is the same `PurchaseService` the assistant's tools call. The browser and
+the model therefore cannot end up with different definitions of what a purchase
+is — the only difference is that the page passes the draft reference it was
+given, where the assistant resolves the newest draft server-side.
+
 ### What these endpoints will not tell you
 
 - **Stock levels.** Availability is published as `IN_STOCK`, `LOW_STOCK` or
@@ -568,6 +610,8 @@ Vite serves on http://localhost:5173 and proxies `/api` to the backend, so run
 |-------|------|--------|
 | `/` | Landing page — what the assistant does, and how to sign up | Public |
 | `/catalog` | Product grid with brand, category and price filters | Signed in |
+| `/cart` | The basket: quantities, removals, running total | Signed in |
+| `/checkout` | The server-priced draft, and the button that places the order | Signed in |
 | `/login`, `/signup` | Auth forms | Public |
 | `/chat` | The assistant | Signed in |
 | `/orders` | Order list, detail and status timeline | Signed in |
@@ -581,6 +625,91 @@ public (see [Catalog and order API](#catalog-and-order-api)), so the catalog
 page is hidden from signed-out visitors but the catalog data is not. The routes
 that matter — chat, orders, profile — are enforced by the backend, which checks
 the token on every request and never trusts the client's redirect.
+
+### The conversation
+
+The active thread is held in a provider above the router, not in the chat page.
+A page component is unmounted the moment the shopper opens the catalog, and with
+it went the conversation they were in the middle of. Keeping it above means
+browsing mid-conversation costs nothing, and a reply that lands while they are
+on another page is still there when they come back.
+
+Past conversations are listed beside the thread, from
+`GET /api/chat/conversations`, and reopening one replays it through
+`GET /api/chat/conversations/{id}`. The id of the open thread is remembered in
+`localStorage` under `shopassist.chat.<userId>`, so a reload returns to it.
+
+### When the model invents a catalogue
+
+The grounding check compares every SKU, order number, date and price in a reply
+against what the tools returned that turn. It used to excuse a turn that called
+no tool at all, on the reasoning that a conversational reply has nothing to be
+grounded against — and that excused the worst case rather than a harmless one.
+A reply with no figures in it never reaches that point; it has no claims. A
+reply that gets there without a tool call has stated products and prices having
+looked nothing up.
+
+Observed: asked for shoes, the assistant produced three products with invented
+SKUs and invented prices under the heading "based on popular choices". The
+finding was computed, logged at debug level, and discarded, so the shopper was
+shown a fabricated catalogue with no warning, picked from it, and only found out
+when the purchase failed with an unknown SKU.
+
+It is now reported as ungrounded, and the frontend distinguishes the two cases:
+part of a reply unverified is a caution, while a reply where **nothing** was
+looked up says so plainly.
+
+### Buying from the chat
+
+A turn that prices or places a purchase carries a `action` object beside the
+reply text, holding the tool's own result: the priced draft, or the order with
+the number the shop assigned. The page renders that as a card with **Confirm and
+order** / **Not now** buttons, and confirming posts to
+`POST /api/purchases/{reference}/confirm` — the same endpoint the checkout page
+uses. Agreeing to a total therefore never has to be typed, and never goes back
+through the model.
+
+This exists because the prose is where the assistant goes wrong. It has been
+observed pricing one pair of shoes and then describing two, and announcing an
+order without ever quoting its number — leaving a shopper unable to find in
+their order history the thing they had just been told was placed. The card is
+the fix: every figure on it, and the order number, comes from the tool result
+rather than from the sentence written about it. Where the two disagree, the card
+is the one that is true.
+
+The card only exists when `createOrderDraft` actually ran, and a 7B model
+regularly asks "would you like to proceed?" one turn before it prices anything
+— at which point there is genuinely nothing to confirm, and inventing a button
+would mean the UI guessing at a purchase. The prompt tells it to draft as soon
+as a shopper names a listed product; it does not always comply. So when a reply
+asks a purchase question and no draft came with it, the page offers a
+**Yes, price it up** chip. That only sends the answer for them, which reliably
+produces the draft and therefore the real Confirm button on the next turn — two
+clicks instead of typing, with the deterministic step still deterministic.
+
+The model may still call `confirmOrder` itself when a shopper types "yes". Both
+paths end in the same card, so either way the order number is shown and matches
+what lands on the orders page.
+
+One asymmetry worth knowing: a replayed thread shows the messages but not the
+insight panels or the purchase cards. Which tools ran, and whether the answer was grounded, is
+computed per turn and returned by `POST /api/chat` — it is not stored against
+the message. So insights and cards appear on turns this session sent, and not on
+history loaded back from the server. Persisting them is Phase 8 work.
+
+### Cart and checkout
+
+The cart lives in the browser, under `localStorage` key
+`shopassist.cart.<userId>` so two accounts sharing a machine do not share a
+basket. That is deliberate: a cart is a UI concept, and the server already has
+the right model for a committed basket in `OrderDraft`. Nothing about a cart is
+authoritative — its prices are a snapshot taken when items were added, and the
+figures the shopper actually agrees to come from the draft the server prices at
+checkout. Where the two disagree, the checkout page says so and the server's
+total wins.
+
+`Buy now` on a product card skips the cart, drafting that one item on its own,
+and leaves whatever else was collected alone.
 
 ### Theme
 

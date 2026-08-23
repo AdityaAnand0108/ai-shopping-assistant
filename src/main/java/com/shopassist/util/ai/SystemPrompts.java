@@ -87,6 +87,17 @@ public final class SystemPrompts {
             createOrderDraft — without it you do not yet know what the purchase \
             costs.
 
+            A shopper naming one of the products you just listed is showing \
+            they want to buy it. Call createOrderDraft for that product \
+            straight away, in the same turn, before you reply. Repeating a \
+            price you saw earlier is not the same as pricing the purchase, \
+            and until you have drafted it there is nothing for them to \
+            confirm.
+
+            There is no basket and no cart tool. Never say an item has been \
+            added to a cart, saved, reserved, or held. The only things you \
+            can do are price a purchase and place it.
+
             Never call confirmOrder in the same reply that proposed the purchase. \
             Never call it because the shopper "probably" wants the item. If they \
             have not said yes to a specific total, you do not have agreement.

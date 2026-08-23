@@ -8,6 +8,7 @@ import com.shopassist.repository.order.OrderDraftRepository;
 import com.shopassist.repository.user.AppUserRepository;
 import com.shopassist.security.AppUserPrincipal;
 import com.shopassist.services.DemoDataInstaller;
+import com.shopassist.services.ai.guard.ToolCallRecorder;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Arrays;
@@ -57,14 +58,62 @@ class ToolGuardrailsTest {
     @Autowired
     private OrderDraftRepository draftRepository;
 
+    @Autowired
+    private ToolCallRecorder recorder;
+
+    /** Stands in for the conversation a chat turn would supply. */
+    private static final String CONVERSATION = "conversation-under-test";
+
     @BeforeEach
     void setUp() {
         installer.install();
+        // The tools always run inside a chat turn in production, and confirming
+        // is scoped to that turn's conversation, so the tests open one too.
+        recorder.startTurn(CONVERSATION);
     }
 
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
+        recorder.clear();
+    }
+
+    // --- what the client is told the turn did -------------------------------
+
+    @Test
+    void drafting_reportsTheReferenceSoAPageCanConfirmIt() {
+        signIn("demo");
+
+        var draft = purchaseTools.createOrderDraft("NIK-TS-001:2");
+
+        // The client needs the reference itself, not merely to know a draft
+        // happened: it is what a Confirm button posts back.
+        assertThat(recorder.draftReference()).isEqualTo(draft.draftReference());
+        assertThat(recorder.placedOrderNumber()).isNull();
+    }
+
+    @Test
+    void confirming_reportsTheOrderNumberTheShopActuallyAssigned() {
+        signIn("demo");
+        purchaseTools.createOrderDraft("NIK-TS-001:2");
+
+        var placed = purchaseTools.confirmOrder();
+
+        // This is the number a shopper is shown. Taking it from the tool result
+        // rather than from the sentence the model wrote is the whole point: the
+        // model has been observed announcing an order without quoting one, and
+        // describing contents that did not match what it bought.
+        assertThat(recorder.placedOrderNumber()).isEqualTo(placed.orderNumber());
+    }
+
+    @Test
+    void aTurnThatBuysNothingReportsNoPurchase() {
+        signIn("demo");
+
+        catalogTools.searchProducts("nike t-shirt", null, null, null, null, null);
+
+        assertThat(recorder.draftReference()).isNull();
+        assertThat(recorder.placedOrderNumber()).isNull();
     }
 
     // --- the structural guarantee -------------------------------------------
@@ -247,6 +296,43 @@ class ToolGuardrailsTest {
                 .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("nothing to confirm");
         assertThat(orderTools.listMyOrders()).isEmpty();
+    }
+
+    @Test
+    void aDraftLeftPendingInAnotherConversationCannotBeConfirmedHere() {
+        // The bug this replaced, seen in a real log: a shopper drafted a $1,099
+        // laptop in one thread and left it. In a later thread about $129 shoes
+        // the model called confirmOrder, and "the shopper's most recent draft"
+        // resolved to the laptop. Agreeing to one purchase must never place a
+        // different one proposed somewhere else.
+        signIn("demo");
+        purchaseTools.createOrderDraft("DEL-LP-001:1");
+
+        recorder.clear();
+        recorder.startTurn("a-different-conversation");
+
+        assertThatThrownBy(() -> purchaseTools.confirmOrder())
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("nothing to confirm in this conversation");
+        assertThat(orderTools.listMyOrders()).isEmpty();
+    }
+
+    @Test
+    void confirmsTheDraftFromItsOwnConversationEvenWhenANewerOneExistsElsewhere() {
+        signIn("demo");
+        purchaseTools.createOrderDraft("BK-001:1");
+
+        // A newer draft, in another thread, for something far more expensive.
+        recorder.clear();
+        recorder.startTurn("another-conversation");
+        purchaseTools.createOrderDraft("DEL-LP-001:1");
+
+        // Back in the first thread, agreeing buys the book, not the laptop.
+        recorder.clear();
+        recorder.startTurn(CONVERSATION);
+        var placed = purchaseTools.confirmOrder();
+
+        assertThat(placed.total()).isEqualByComparingTo("16.99");
     }
 
     @Test

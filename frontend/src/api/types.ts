@@ -97,6 +97,35 @@ export interface OrderDetail extends OrderSummary {
   timeline: TrackingStep[]
 }
 
+export type DraftStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'EXPIRED'
+
+/** One line of a priced proposal, as the server priced it. */
+export interface DraftItem {
+  sku: string
+  name: string
+  brand: string
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+  imageUrl: string | null
+}
+
+/**
+ * A basket the server has priced. No order exists yet.
+ *
+ * The prices here are authoritative — the cart's own figures are a local
+ * snapshot taken when items were added, and this is what the shopper is
+ * actually agreeing to.
+ */
+export interface Draft {
+  reference: string
+  status: DraftStatus
+  items: DraftItem[]
+  totalAmount: number
+  currency: string
+  expiresAt: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'USER' | 'ASSISTANT'
@@ -119,10 +148,26 @@ export interface TurnInsight {
   redacted: boolean
 }
 
+/**
+ * What a turn did to the basket or to an order.
+ *
+ * Kept apart from the reply text because the prose is where the model goes
+ * wrong — it has priced one pair of shoes and then described two, and announced
+ * an order without ever quoting its number. Render this; treat the sentence
+ * about it as commentary.
+ */
+export interface TurnAction {
+  /** A purchase priced this turn and still waiting on a yes. */
+  draft: Draft | null
+  /** An order actually placed this turn. */
+  order: OrderDetail | null
+}
+
 export interface ChatResponse {
   conversationId: string
   reply: ChatMessage
   insight: TurnInsight
+  action: TurnAction | null
 }
 
 export interface ConversationSummary {

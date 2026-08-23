@@ -69,9 +69,14 @@ public class PurchaseService {
 
     /**
      * Prices a proposed purchase. Creates no order and takes no payment.
+     *
+     * @param conversationRef the thread this was proposed in, or null when it
+     *                        came from the checkout page. It is what scopes a
+     *                        later {@link #confirmLatestDraftIn} to the right
+     *                        purchase.
      */
     @Transactional
-    public OrderDraft createDraft(Map<String, Integer> quantityBySku) {
+    public OrderDraft createDraft(Map<String, Integer> quantityBySku, String conversationRef) {
         if (quantityBySku == null || quantityBySku.isEmpty()) {
             throw new InvalidRequestException("A purchase needs at least one item");
         }
@@ -83,6 +88,7 @@ public class PurchaseService {
         AppUser user = currentUserService.requireUser();
         OrderDraft draft = OrderDraft.builder()
                 .user(user)
+                .conversationRef(conversationRef)
                 .status(DraftStatus.PENDING)
                 .currency(CURRENCY)
                 .totalAmount(BigDecimal.ZERO)
@@ -136,14 +142,32 @@ public class PurchaseService {
      * never have to carry an identifier it can get wrong. The two-step guarantee
      * is untouched — a draft must still have been built in an earlier call, so
      * no single call both decides on a purchase and completes it.
+     *
+     * <p>Scoped to one conversation, which it was not originally. "The shopper's
+     * most recent draft" is the right answer inside a thread and the wrong one
+     * across two: a draft left unconfirmed in an earlier conversation was the
+     * newest draft everywhere, so a shopper agreeing to a purchase in a later
+     * conversation could confirm that earlier one instead. Observed in a log
+     * where a $1,099 draft from one thread was the target of a confirm in
+     * another thread about $129 shoes; it failed for an unrelated reason.
      */
     @Transactional
-    public Order confirmLatestDraft() {
+    public Order confirmLatestDraftIn(String conversationRef) {
+        if (conversationRef == null) {
+            // Only a chat turn has a conversation, and only a chat turn calls
+            // this. Refusing is safer than falling back to "the newest draft
+            // anywhere", which is the behaviour this replaced.
+            throw new InvalidRequestException(
+                    "There is nothing to confirm yet. Price the purchase first.");
+        }
+
         OrderDraft draft = draftRepository
-                .findFirstByUserIdOrderByIdDesc(currentUserService.requireUserId())
+                .findFirstByUserIdAndConversationRefOrderByIdDesc(
+                        currentUserService.requireUserId(), conversationRef)
                 .orElseThrow(() -> new InvalidRequestException(
-                        "There is nothing to confirm yet. Build the purchase first, "
-                                + "tell the shopper the total, and then confirm it."));
+                        "There is nothing to confirm in this conversation. Build the "
+                                + "purchase first with createOrderDraft, tell the shopper "
+                                + "the total, and then confirm it."));
 
         return confirm(draft);
     }
@@ -151,7 +175,7 @@ public class PurchaseService {
     /**
      * Confirms one specific draft by reference.
      *
-     * <p>Not reachable from the assistant, which uses {@link #confirmLatestDraft()}.
+     * <p>Not reachable from the assistant, which uses {@link #confirmLatestDraftIn}.
      * Kept for a UI that shows a drafted purchase and lets the shopper click it,
      * where the reference is carried by the page rather than recalled by a model.
      */
@@ -319,6 +343,22 @@ public class PurchaseService {
             }
         }
         throw new IllegalStateException("Could not allocate an order number");
+    }
+
+    /**
+     * One of the shopper's drafts, scoped to them like every other lookup here.
+     *
+     * <p>Used to show a priced purchase back to the page that will confirm it.
+     */
+    @Transactional(readOnly = true)
+    public OrderDraft draft(String draftRef) {
+        OrderDraft draft = draftRepository
+                .findByPublicRefAndUserId(draftRef, currentUserService.requireUserId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No pending purchase found with reference " + draftRef));
+        // Touch the lines while the session is open; the caller maps them outside.
+        draft.getItems().size();
+        return draft;
     }
 
     /** Read-only view used by the assistant's tools. */

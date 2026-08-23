@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ApiError, api, money } from '../api/client'
 import type { CatalogFilters, Page, ProductSummary } from '../api/types'
+import { useCart } from '../cart/CartContext'
 import { ErrorNote } from '../components/ErrorNote'
 import { Spinner } from '../components/Spinner'
 
@@ -19,6 +21,20 @@ export function CatalogPage() {
   const [filters, setFilters] = useState<CatalogFilters | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const { add, quantityOf } = useCart()
+  const navigate = useNavigate()
+  // Which SKU just went in, so the button can confirm it without a toast
+  // library or a layout shift.
+  const [justAdded, setJustAdded] = useState<string | null>(null)
+  const [cartError, setCartError] = useState<string | null>(null)
+
+  const addToCart = (product: ProductSummary) => {
+    const problem = add(product)
+    setCartError(problem)
+    if (problem) return
+    setJustAdded(product.sku)
+    window.setTimeout(() => setJustAdded((sku) => (sku === product.sku ? null : sku)), 1600)
+  }
 
   useEffect(() => {
     api.filters().then(setFilters).catch(() => setFilters(null))
@@ -125,6 +141,7 @@ export function CatalogPage() {
       </form>
 
       <ErrorNote message={error} />
+      <ErrorNote message={cartError} />
 
       {loading && <Spinner label="Loading products…" />}
 
@@ -162,6 +179,37 @@ export function CatalogPage() {
                     <code>{product.sku}</code>
                     {product.rating != null && <> · {product.rating.toFixed(1)}★</>}
                   </p>
+
+                  {product.availability === 'OUT_OF_STOCK' ? (
+                    <button type="button" className="button small block" disabled>
+                      Out of stock
+                    </button>
+                  ) : (
+                    <div className="product-actions">
+                      <button
+                        type="button"
+                        className="button small block"
+                        onClick={() => addToCart(product)}
+                      >
+                        {justAdded === product.sku ? 'Added ✓' : 'Add to cart'}
+                      </button>
+                      <button
+                        type="button"
+                        className="button small block ghost"
+                        onClick={() =>
+                          navigate('/checkout', {
+                            state: { buyNow: { sku: product.sku, quantity: 1 } },
+                          })
+                        }
+                      >
+                        Buy now
+                      </button>
+                    </div>
+                  )}
+
+                  {quantityOf(product.sku) > 0 && (
+                    <p className="muted small in-cart">{quantityOf(product.sku)} in your cart</p>
+                  )}
                 </div>
               </li>
             ))}
