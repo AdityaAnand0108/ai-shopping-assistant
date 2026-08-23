@@ -1,0 +1,25 @@
+# Binary files must never have their line endings rewritten.
+#
+# Git guesses whether a file is text by looking for NUL bytes, and with
+# core.autocrlf enabled on Windows it warns about converting anything it thinks
+# is text. It guessed right for the setup guide, but a PDF that happened to
+# contain no NUL byte early on would be silently corrupted on checkout. Saying
+# so explicitly removes the guess.
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.jar   binary
+*.zip   binary
+
+# The Maven wrapper ships two scripts run by two different shells. mvnw is read
+# by sh and breaks with CRLF; mvnw.cmd is read by cmd.exe and wants CRLF.
+mvnw     text eol=lf
+mvnw.cmd text eol=crlf
+*.sh     text eol=lf
+*.bat    text eol=crlf
