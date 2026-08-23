@@ -1,11 +1,30 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="AI shopping assistant: search products, check orders, and buy through chat." />
     <title>ShopAssist</title>
+    <script>
+      // Resolve the saved theme before the first paint. Doing this in React
+      // instead would show one frame of the wrong palette on every load.
+      // Must stay in step with src/theme/ThemeContext.tsx, which owns the key
+      // and the same default.
+      (function () {
+        try {
+          var saved = localStorage.getItem('shopassist-theme')
+          var preference = saved === 'dark' || saved === 'light' || saved === 'system' ? saved : 'light'
+          var dark =
+            preference === 'dark' ||
+            (preference === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+        } catch (error) {
+          // Storage can throw in private browsing. The light default is already
+          // on the element, so there is nothing to recover from.
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

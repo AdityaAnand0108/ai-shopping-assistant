@@ -141,6 +141,10 @@ immediately whether the data layer or the model is at fault.
 
 ### Catalog — public
 
+These three stay open, with no token required. The frontend's `/catalog` page is
+behind sign-in, but that is a product decision applied in the UI; it does not
+change what these endpoints will answer.
+
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/api/products` | Search with filters, sorting and paging |
@@ -549,6 +553,43 @@ Override `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` as needed.
 ollama pull qwen2.5:7b
 ollama pull nomic-embed-text
 ```
+
+## Frontend
+
+```bash
+npm install --prefix frontend
+npm run dev --prefix frontend
+```
+
+Vite serves on http://localhost:5173 and proxies `/api` to the backend, so run
+`./mvnw spring-boot:run` alongside it.
+
+| Route | Page | Access |
+|-------|------|--------|
+| `/` | Landing page — what the assistant does, and how to sign up | Public |
+| `/catalog` | Product grid with brand, category and price filters | Signed in |
+| `/login`, `/signup` | Auth forms | Public |
+| `/chat` | The assistant | Signed in |
+| `/orders` | Order list, detail and status timeline | Signed in |
+
+Only the landing page and the two auth forms are reachable without a session;
+everything else redirects to sign-in and returns you to where you were headed
+once you are in.
+
+Note that `/catalog` is gated **in the UI only**. `GET /api/products` is still
+public (see [Catalog and order API](#catalog-and-order-api)), so the catalog
+page is hidden from signed-out visitors but the catalog data is not. The routes
+that matter — chat, orders, profile — are enforced by the backend, which checks
+the token on every request and never trusts the client's redirect.
+
+### Theme
+
+Light, dark, or match-the-system, chosen from the control in the header and
+remembered in `localStorage` under `shopassist-theme`. **Light is the default**
+when nothing has been chosen. A small inline script in `index.html` resolves the
+saved choice onto a `data-theme` attribute before the first paint, so a reload
+never flashes the wrong palette; `src/theme/ThemeContext.tsx` owns the same key
+and default from then on. Both palettes are checked at WCAG AA for body text.
 
 ## Project layout
 
