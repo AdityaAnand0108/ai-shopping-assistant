@@ -5,38 +5,78 @@
  * rather than inherited.
  */
 
+/*
+ * Palette.
+ *
+ * The light theme is the default. `data-theme` on <html> is always resolved to
+ * a concrete "light" or "dark" — the three-way preference (system/light/dark)
+ * lives in localStorage and is turned into one of those two by the small script
+ * in index.html before first paint, then kept in step by ThemeProvider. That
+ * keeps the dark palette written once here rather than duplicated across a
+ * media query and an attribute selector.
+ */
+
 :root {
-  --bg: #f7f7f8;
+  color-scheme: light;
+
+  --bg: #f5f7fb;
   --surface: #ffffff;
-  --border: #e3e3e7;
-  --text: #1c1c1f;
-  --muted: #6a6a72;
-  --accent: #1f5eff;
+  --border: #e2e7f0;
+  --text: #16181f;
+  --muted: #5b6273;
+  /* Chosen so small text in the accent colour clears 4.5:1 against the hero
+     gradient's lightest stop, not just against the page background. */
+  --accent: #1d5af5;
   --accent-dark: #1447c4;
-  --good: #127a4a;
+  /* Text placed on an accent fill. The dark palette's accent is a light blue,
+     so white on it falls to about 2.9:1 — under it goes dark instead. */
+  --on-accent: #ffffff;
+  --good: #0f7a49;
   --bad: #b3261e;
   --warn-bg: #fff6e5;
   --warn-border: #f0c476;
   --warn-text: #7a4f00;
   --radius: 10px;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow: 0 1px 2px rgba(16, 24, 64, 0.06);
+
+  /* Landing page only: a second and third hue so the marketing surface can
+     carry gradients without the product UI inheriting them. */
+  --accent-2: #7b3ff2;
+  --accent-3: #00a294;
+  --glow-1: rgba(31, 94, 255, 0.22);
+  --glow-2: rgba(123, 63, 242, 0.18);
+  --glow-3: rgba(0, 162, 148, 0.16);
+  --hero-bg: linear-gradient(180deg, #e8eeff 0%, var(--bg) 62%);
+  --surface-2: #f8fafd;
+  --shadow-lift: 0 12px 32px rgba(20, 24, 60, 0.10);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #16161a;
-    --surface: #1e1e24;
-    --border: #32323b;
-    --text: #ececf1;
-    --muted: #9c9caa;
-    --accent: #6b93ff;
-    --accent-dark: #8fadff;
-    --good: #4ecb8b;
-    --bad: #ff8a80;
-    --warn-bg: #3a2f16;
-    --warn-border: #7a6229;
-    --warn-text: #f2d79b;
-  }
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #16161a;
+  --surface: #1e1e24;
+  --border: #32323b;
+  --text: #ececf1;
+  --muted: #9c9caa;
+  --accent: #6b93ff;
+  --accent-dark: #8fadff;
+  --on-accent: #10131c;
+  --good: #4ecb8b;
+  --bad: #ff8a80;
+  --warn-bg: #3a2f16;
+  --warn-border: #7a6229;
+  --warn-text: #f2d79b;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+
+  --accent-2: #a98bff;
+  --accent-3: #4fd8c6;
+  --glow-1: rgba(76, 118, 255, 0.30);
+  --glow-2: rgba(140, 86, 255, 0.26);
+  --glow-3: rgba(0, 184, 163, 0.18);
+  --hero-bg: linear-gradient(180deg, #1c1d29 0%, var(--bg) 62%);
+  --surface-2: #23232c;
+  --shadow-lift: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 * { box-sizing: border-box; }
@@ -45,8 +85,16 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  /* Deliberately not transitioned. Animating a background-color whose value
+     comes from a custom property leaves it stuck on the old colour in Chrome
+     when only the property changes, so a theme switch would keep the previous
+     page background. An instant swap is the norm anyway. */
   font: 15px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
+
+/* Without this, inline links fall back to the browser default blue, which is
+   close to unreadable against the dark palette. */
+a { color: var(--accent); }
 
 h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
 h2 { font-size: 1.05rem; margin: 0 0 0.5rem; }
@@ -79,7 +127,26 @@ code {
 
 /* --- shell --------------------------------------------------------------- */
 
+/* Keyboard and screen-reader users get past the nav in one press; it only
+   becomes visible once focused. */
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -3rem;
+  z-index: 30;
+  padding: 0.5rem 0.9rem;
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: 0 0 8px 8px;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus { top: 0; }
+
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   gap: 1.5rem;
@@ -103,7 +170,42 @@ code {
 
 .account { margin-left: auto; display: flex; align-items: center; gap: 0.75rem; }
 
+/* --- theme toggle -------------------------------------------------------- */
+
+.theme-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+}
+
+.theme-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.theme-option svg { width: 15px; height: 15px; }
+.theme-option:hover { color: var(--text); }
+/* The pressed state is the only thing marking the current theme, so it carries
+   a fill and a colour change rather than colour alone. */
+.theme-option[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: var(--shadow);
+}
+
 main { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+/* The landing page manages its own width and rhythm. */
+main.full-bleed { max-width: none; padding: 0; }
 
 .panel {
   background: var(--surface);
@@ -136,7 +238,7 @@ input[aria-invalid='true'] { border-color: var(--bad); }
   border: 0;
   border-radius: 8px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -145,6 +247,25 @@ input[aria-invalid='true'] { border-color: var(--bad); }
 .button:hover:not(:disabled) { background: var(--accent-dark); }
 .button:disabled { opacity: 0.55; cursor: not-allowed; }
 .button.small { margin: 0; padding: 0.35rem 0.75rem; font-size: 0.85rem; }
+
+.button.large {
+  margin: 0;
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px var(--glow-1);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.button.large:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 24px var(--glow-1); }
+
+/* A quieter second action: same weight and box, no fill. */
+.button.ghost {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+.button.ghost:hover:not(:disabled) { background: var(--surface); border-color: var(--accent); color: var(--accent); }
 
 .link { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; padding: 0; }
 
@@ -206,7 +327,7 @@ input[aria-invalid='true'] { border-color: var(--bad); }
 .suggestions { list-style: none; padding: 0; margin: 1rem 0 0; display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
 
 .bubble { max-width: 78%; margin: 0.75rem 0; padding: 0.7rem 0.9rem; border-radius: var(--radius); border: 1px solid var(--border); }
-.bubble.user { margin-left: auto; background: var(--accent); border-color: var(--accent); color: #fff; }
+.bubble.user { margin-left: auto; background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .bubble.assistant { background: var(--bg); }
 .bubble.pending { opacity: 0.75; }
 .bubble-role { margin: 0 0 0.25rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7; }
@@ -277,6 +398,273 @@ input[aria-invalid='true'] { border-color: var(--bad); }
   .orders-layout { grid-template-columns: 1fr; }
   .bubble { max-width: 92%; }
   .topbar { flex-wrap: wrap; gap: 0.75rem 1rem; }
+}
+
+/* --- landing ------------------------------------------------------------- */
+
+.landing { --gutter: clamp(1.25rem, 5vw, 4rem); }
+
+/* Sections fade up as they arrive. The transition is what the reduced-motion
+   rule below switches off, so the `is-visible` state alone still shows them. */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.reveal.is-visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; }
+}
+
+.gradient-text {
+  background: linear-gradient(100deg, var(--accent), var(--accent-2) 55%, var(--accent-3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* --- landing: hero ------------------------------------------------------- */
+
+.hero { position: relative; overflow: hidden; background: var(--hero-bg); padding: clamp(3rem, 7vw, 5.5rem) var(--gutter) 3rem; }
+
+.hero-glow { position: absolute; inset: 0; pointer-events: none; }
+.blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.9; }
+.blob-a { width: 30rem; height: 30rem; top: -10rem; left: -6rem; background: var(--glow-1); animation: drift 22s ease-in-out infinite; }
+.blob-b { width: 26rem; height: 26rem; top: -4rem; right: -6rem; background: var(--glow-2); animation: drift 26s ease-in-out infinite reverse; }
+.blob-c { width: 22rem; height: 22rem; bottom: -12rem; left: 35%; background: var(--glow-3); animation: drift 30s ease-in-out infinite; }
+
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(2.5rem, 1.5rem, 0) scale(1.08); }
+}
+
+.hero-inner {
+  position: relative;
+  max-width: 1160px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(2rem, 5vw, 4rem);
+  align-items: center;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1.1rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+.eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); animation: pulse 2.4s ease-in-out infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+
+.hero h1 { font-size: clamp(2.1rem, 5vw, 3.4rem); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 1rem; }
+.lede { font-size: clamp(1rem, 1.5vw, 1.12rem); color: var(--muted); margin: 0 0 1.75rem; max-width: 34rem; }
+
+.cta-row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.cta-row.centered-row { justify-content: center; }
+.cta-note { margin: 1rem 0 0; }
+
+/* --- landing: hero demo card --------------------------------------------- */
+
+.hero-demo { position: relative; }
+.demo-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+  transform: perspective(1200px) rotateY(-4deg) rotateX(2deg);
+  transition: transform 0.4s ease;
+}
+.demo-card:hover { transform: perspective(1200px) rotateY(0deg) rotateX(0deg); }
+
+.demo-head { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.demo-dots { display: flex; gap: 0.3rem; }
+.demo-dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--border); }
+
+.demo-body { padding: 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.demo-msg { max-width: 88%; margin: 0; padding: 0.6rem 0.8rem; border-radius: 12px; font-size: 0.9rem; }
+.demo-msg.from-user { align-self: flex-end; background: var(--accent); color: var(--on-accent); border-bottom-right-radius: 4px; }
+.demo-msg.from-user.short { max-width: 62%; }
+.demo-msg.from-bot { align-self: flex-start; background: var(--bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.demo-msg.from-bot p { margin: 0; }
+
+.demo-products { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.demo-products li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.35rem 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+
+.demo-source { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.55rem !important; font-size: 0.75rem; color: var(--good); font-weight: 600; }
+.demo-source svg { width: 13px; height: 13px; flex: 0 0 auto; }
+
+.demo-msg.typing { display: flex; gap: 0.28rem; padding: 0.75rem 0.85rem; }
+.typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1.4s ease-in-out infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes blink {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* --- landing: stats ------------------------------------------------------ */
+
+.stat-strip {
+  position: relative;
+  list-style: none;
+  max-width: 1160px;
+  margin: clamp(2.5rem, 6vw, 4rem) auto 0;
+  padding: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.stat-strip li { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.15rem; }
+.stat-strip strong { font-size: 1.6rem; line-height: 1; letter-spacing: -0.02em; }
+.stat-strip span { font-size: 0.8rem; color: var(--muted); }
+
+/* --- landing: content bands ---------------------------------------------- */
+
+.band { padding: clamp(3rem, 7vw, 5rem) var(--gutter); }
+.band.alt { background: var(--surface); border-block: 1px solid var(--border); }
+
+.band-head { max-width: 40rem; margin: 0 auto clamp(2rem, 4vw, 3rem); text-align: center; }
+.band-head h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); letter-spacing: -0.015em; margin: 0 0 0.6rem; }
+.band-head p { margin: 0; }
+
+.feature-grid {
+  list-style: none;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.1rem;
+}
+.feature-card {
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease,
+    opacity 0.6s ease;
+}
+.feature-card:hover { transform: translateY(-4px); border-color: var(--accent); box-shadow: var(--shadow-lift); }
+.feature-card h3 { font-size: 1rem; margin: 0.9rem 0 0.4rem; }
+.feature-card p { margin: 0; font-size: 0.9rem; }
+
+.icon-well {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px; height: 42px;
+  border-radius: 11px;
+  background: linear-gradient(140deg, var(--glow-1), var(--glow-2));
+  color: var(--accent);
+}
+.feature-icon { width: 21px; height: 21px; }
+
+/* --- landing: steps ------------------------------------------------------ */
+
+.step-list {
+  list-style: none;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  counter-reset: step;
+}
+.step { position: relative; padding-top: 0.25rem; }
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--on-accent);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.step h3 { font-size: 1rem; margin: 0.8rem 0 0.35rem; }
+.step p { margin: 0; font-size: 0.9rem; }
+
+/* --- landing: stack ------------------------------------------------------ */
+
+.stack-row { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; max-width: 780px; margin: 0 auto; }
+.tech-pill {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.tech-pill:hover { color: var(--accent); border-color: var(--accent); }
+
+/* --- landing: closing ---------------------------------------------------- */
+
+.band.closing { padding-bottom: clamp(3rem, 6vw, 4.5rem); }
+.closing-card {
+  position: relative;
+  overflow: hidden;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: clamp(2rem, 5vw, 3.25rem);
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 15% 0%, var(--glow-1), transparent 55%),
+    radial-gradient(circle at 85% 100%, var(--glow-2), transparent 55%),
+    var(--surface);
+  box-shadow: var(--shadow-lift);
+}
+.closing-card h2 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 0 0 0.6rem; }
+.closing-card > p { margin: 0 auto 1.75rem; max-width: 34rem; }
+/* Scoped to beat the `.closing-card > p` rule above, which would otherwise
+   collapse the gap under the buttons. */
+.closing-card .demo-accounts { margin: 1.5rem 0 0; font-size: 0.85rem; color: var(--muted); }
+
+/* --- landing: footer ----------------------------------------------------- */
+
+.landing-footer {
+  padding: 2rem var(--gutter) 2.5rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  text-align: center;
+}
+.landing-footer .brand { display: block; margin: 0 0 0.75rem; }
+.landing-footer nav { display: flex; flex-wrap: wrap; gap: 1.25rem; justify-content: center; margin-bottom: 0.9rem; }
+.landing-footer nav a { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+.landing-footer nav a:hover { color: var(--accent); }
+.landing-footer p:last-child { margin: 0; }
+
+@media (max-width: 880px) {
+  .hero-inner { grid-template-columns: 1fr; }
+  /* Copy and CTA stay first on a narrow screen; the illustration follows, so
+     the reason to sign up is not pushed below the fold by a picture. */
+  .hero-demo { max-width: 460px; }
+  .demo-card { transform: none; }
+  .lede { max-width: none; }
 }
 
 /* Respect a stated preference for reduced motion. */

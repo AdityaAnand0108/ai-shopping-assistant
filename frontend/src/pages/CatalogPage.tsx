@@ -52,7 +52,7 @@ export function CatalogPage() {
     <div className="panel">
       <h1>Catalog</h1>
       <p className="muted">
-        Browsing works without an account, the same as any storefront.
+        Every product in the demo catalog. The assistant searches the same data.
       </p>
 
       <form className="filters" onSubmit={handleSearch} role="search">
