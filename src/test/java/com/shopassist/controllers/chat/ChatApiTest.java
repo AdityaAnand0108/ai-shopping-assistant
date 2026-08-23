@@ -85,6 +85,38 @@ class ChatApiTest {
     // --- a turn -------------------------------------------------------------
 
     @Test
+    void marksAReplyThatNamesProductsWithoutLookingAnythingUp() throws Exception {
+        // The stub calls no tools, so this is the real shape of the failure seen
+        // in use: the model answers "based on popular choices" with products,
+        // SKUs and prices it invented. The response has to say so, because the
+        // shopper is about to pick one of them.
+        stub.willReply("""
+                Based on popular choices, here are a few options for shoes:
+                1. Nike Air Max 270 - SKU: SNY-AM-001, Price: $129.99
+                2. Adidas Ultraboost - SKU: SNY-UB-001, Price: $159.99""");
+
+        mockMvc.perform(chat("satvik", """
+                        {"message":"what shoes do you have"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.insight.grounded").value(false))
+                .andExpect(jsonPath("$.insight.toolsUsed", hasSize(0)))
+                .andExpect(jsonPath("$.insight.unsupported", hasSize(4)));
+    }
+
+    @Test
+    void leavesAPlainConversationalReplyAlone() throws Exception {
+        // The counterweight: no tools and no claims is not a grounding failure,
+        // or every greeting would carry a warning and shoppers would learn to
+        // ignore all of them.
+        stub.willReply("I can help you find products, check an order, or place one.");
+
+        mockMvc.perform(chat("satvik", """
+                        {"message":"what can you do?"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.insight.grounded").value(true));
+    }
+
+    @Test
     void answersAndOpensAConversation() throws Exception {
         stub.willReply("I can help you find products once I am connected to the catalog.");
 

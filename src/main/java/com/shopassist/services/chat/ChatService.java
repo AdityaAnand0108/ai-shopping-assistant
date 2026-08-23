@@ -7,7 +7,12 @@ import com.shopassist.dto.chat.ChatRequest;
 import com.shopassist.dto.chat.ChatResponse;
 import com.shopassist.dto.chat.ConversationDetailResponse;
 import com.shopassist.dto.chat.ConversationSummaryResponse;
+import com.shopassist.dto.chat.TurnAction;
 import com.shopassist.dto.chat.TurnInsight;
+import com.shopassist.dto.order.DraftResponse;
+import com.shopassist.dto.order.OrderDetailResponse;
+import com.shopassist.services.order.CheckoutService;
+import com.shopassist.services.order.OrderService;
 import com.shopassist.entity.chat.ChatMessage;
 import com.shopassist.security.CurrentUserService;
 import com.shopassist.services.ai.AssistantModel;
@@ -56,6 +61,8 @@ public class ChatService {
     private final OutputGuard outputGuard;
     private final GroundingCheck groundingCheck;
     private final ToolCallRecorder toolCallRecorder;
+    private final CheckoutService checkoutService;
+    private final OrderService orderService;
 
     public ChatService(ConversationStore store,
                        AssistantModel assistantModel,
@@ -64,7 +71,9 @@ public class ChatService {
                        InputGuard inputGuard,
                        OutputGuard outputGuard,
                        GroundingCheck groundingCheck,
-                       ToolCallRecorder toolCallRecorder) {
+                       ToolCallRecorder toolCallRecorder,
+                       CheckoutService checkoutService,
+                       OrderService orderService) {
         this.store = store;
         this.assistantModel = assistantModel;
         this.currentUserService = currentUserService;
@@ -73,6 +82,8 @@ public class ChatService {
         this.outputGuard = outputGuard;
         this.groundingCheck = groundingCheck;
         this.toolCallRecorder = toolCallRecorder;
+        this.checkoutService = checkoutService;
+        this.orderService = orderService;
     }
 
     public ChatResponse send(ChatRequest request) {
@@ -90,13 +101,18 @@ public class ChatService {
         List<String> toolsUsed;
         java.util.Set<String> toolFacts;
         GroundingCheck.Result grounding;
+        String draftReference;
+        String placedOrderNumber;
         try {
-            toolCallRecorder.startTurn();
+            toolCallRecorder.startTurn(turn.conversationRef());
             reply = assistantModel.reply(new AssistantExchange(
                     SystemPrompts.WITH_TOOLS, turn.history(), question));
 
             toolsUsed = toolCallRecorder.toolsUsed();
             toolFacts = toolCallRecorder.identifiers();
+            // Read before the finally block clears the recorder.
+            draftReference = toolCallRecorder.draftReference();
+            placedOrderNumber = toolCallRecorder.placedOrderNumber();
             grounding = groundingCheck.check(reply.content(),
                     toolCallRecorder.identifiers(),
                     toolCallRecorder.amounts(),
@@ -118,7 +134,44 @@ public class ChatService {
                 new AssistantReply(finalContent, reply.model(), reply.latencyMs()), toolFacts);
 
         return new ChatResponse(turn.conversationRef(), ChatMessageResponse.from(answer),
-                new TurnInsight(toolsUsed, grounding.grounded(), grounding.unsupported(), redacted));
+                new TurnInsight(toolsUsed, grounding.grounded(), grounding.unsupported(), redacted),
+                actionFor(draftReference, placedOrderNumber));
+    }
+
+    /**
+     * Resolves what the turn did into something a client can render.
+     *
+     * <p>Never throws. A purchase that succeeded must not be reported as a
+     * failure because the read-back for the card did not work — the reply text
+     * still stands on its own, and the shopper's orders page is authoritative
+     * either way.
+     *
+     * <p>When a turn both prices and places a purchase, only the order is
+     * returned: the draft has been spent, and offering a Confirm button for it
+     * would invite a second click that buys nothing.
+     */
+    private TurnAction actionFor(String draftReference, String placedOrderNumber) {
+        OrderDetailResponse order = null;
+        if (placedOrderNumber != null) {
+            try {
+                order = orderService.myOrder(placedOrderNumber);
+            } catch (RuntimeException e) {
+                log.warn("Placed order {} could not be read back for the reply card: {}",
+                        placedOrderNumber, e.getMessage());
+            }
+        }
+
+        DraftResponse draft = null;
+        if (order == null && draftReference != null) {
+            try {
+                draft = checkoutService.view(draftReference);
+            } catch (RuntimeException e) {
+                log.warn("Draft {} could not be read back for the reply card: {}",
+                        draftReference, e.getMessage());
+            }
+        }
+
+        return TurnAction.of(draft, order);
     }
 
     /**
@@ -135,7 +188,7 @@ public class ChatService {
                 java.util.Set.of());
 
         return new ChatResponse(turn.conversationRef(), ChatMessageResponse.from(answer),
-                TurnInsight.refused());
+                TurnInsight.refused(), null);
     }
 
     public List<ConversationSummaryResponse> myConversations() {

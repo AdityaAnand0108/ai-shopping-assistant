@@ -40,7 +40,19 @@ export function InsightPanel({ insight }: { insight: TurnInsight }) {
         </p>
       )}
 
-      {!insight.grounded && (
+      {/* Nothing was looked up at all, yet the reply named products, prices or
+          dates. That is not a partly-unverified answer — none of it came from
+          the catalog, and saying so plainly matters more than a soft warning
+          under a confident list of products that do not exist. */}
+      {!insight.grounded && !hasTools && (
+        <p className="insight-warning" role="note">
+          <span aria-hidden="true">⚠️</span> None of this came from the store's
+          catalog — nothing was looked up, so these products, prices and codes
+          may not exist. Ask again and the assistant will search properly.
+        </p>
+      )}
+
+      {!insight.grounded && hasTools && (
         <p className="insight-warning" role="note">
           <span aria-hidden="true">⚠️</span> Some of this could not be verified
           against our records

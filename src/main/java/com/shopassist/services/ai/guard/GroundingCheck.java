@@ -23,7 +23,10 @@ import java.util.regex.Pattern;
  * count no tool returns at all.
  *
  * <p>So every identifier and amount in the reply is compared against what the
- * tools produced. Anything with no source is unsupported.
+ * tools produced. Anything with no source is unsupported — including, and
+ * especially, when the turn called no tool at all. A reply that names products
+ * and prices having looked nothing up has invented them, and that case used to
+ * be waved through here.
  *
  * <p><b>Flag, do not block.</b> An unsupported figure is usually a wrong number
  * in an otherwise useful answer, and suppressing the whole reply would trade a
@@ -126,15 +129,25 @@ public class GroundingCheck {
             return new Result(true, List.of());
         }
 
-        // A turn that called no tool has nothing to be grounded against; a
-        // conversational reply mentioning no figures is not a failure. Only
-        // treat this as a finding when the model was actually looking things up.
+        // A turn that called no tool used to be excused here, on the reasoning
+        // that a conversational reply has nothing to be grounded against. That
+        // was wrong, and it excused the worst case rather than a harmless one.
+        // A reply with no figures in it never reaches this point — it has no
+        // claims, so `unsupported` is empty and it returned grounded above.
+        // Getting here without a tool call means the model stated SKUs, prices
+        // or dates having looked nothing up: it invented them outright. That is
+        // the least grounded a reply can be, not the most excusable.
+        //
+        // Observed: asked for shoes, the model produced three products with
+        // invented SKUs and prices under the heading "based on popular
+        // choices". The finding was computed, logged at debug, and then thrown
+        // away, so the shopper was shown a fabricated catalogue with no warning
+        // and picked from it.
         if (!anyToolRan) {
-            log.debug("Reply mentions {} with no tool call to support it", unsupported);
-            return new Result(true, List.of());
+            log.warn("Reply states {} having called no tool at all", unsupported);
+        } else {
+            log.warn("Reply contains values no tool returned: {}", unsupported);
         }
-
-        log.warn("Reply contains values no tool returned: {}", unsupported);
         return new Result(false, List.copyOf(unsupported));
     }
 

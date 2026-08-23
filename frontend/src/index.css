@@ -254,7 +254,11 @@ input[aria-invalid='true'] { border-color: var(--bad); }
   font-size: 1rem;
   border-radius: 10px;
   box-shadow: 0 6px 18px var(--glow-1);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  /* Transform and shadow only. Transitioning the background here means that on
+     a theme switch the fill lags behind the text colour, and since the two come
+     from different tokens the button spends that moment as white-on-pale-blue.
+     The plain .button has no transition either, so this also keeps them alike. */
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .button.large:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 24px var(--glow-1); }
 
@@ -321,6 +325,60 @@ input[aria-invalid='true'] { border-color: var(--bad); }
 
 /* --- chat ---------------------------------------------------------------- */
 
+/* History beside the thread on a wide screen; a disclosure above it on a
+   narrow one, where a list of past chats would otherwise push the conversation
+   itself off the bottom of the page. */
+.chat-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.history-toggle { display: none; }
+
+.chat-history {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: calc(100vh - 8rem);
+  padding: 1rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.history-empty { margin: 0; }
+
+.history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.history-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  align-items: flex-start;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.history-row:hover { background: var(--bg); }
+.history-row.selected { border-color: var(--accent); background: var(--bg); }
+.history-title {
+  font-weight: 600;
+  font-size: 0.88rem;
+  /* Titles are the shopper's own first message, so they can be any length. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .chat-panel { display: flex; flex-direction: column; height: calc(100vh - 8rem); }
 .chat-log { flex: 1; overflow-y: auto; padding: 0.5rem 0.25rem 1rem; }
 .chat-empty { padding: 2rem 0; text-align: center; }
@@ -333,6 +391,71 @@ input[aria-invalid='true'] { border-color: var(--bad); }
 .bubble-role { margin: 0 0 0.25rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7; }
 .bubble-text { white-space: pre-wrap; }
 
+/* The authoritative half of an assistant turn: what the shop priced or placed,
+   as opposed to what the model wrote about it. Visually distinct from the
+   bubble so the difference is legible at a glance. */
+.purchase-card {
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.purchase-card.placed { border-color: var(--good); }
+
+.purchase-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+.purchase-card.placed .purchase-card-head { color: var(--good); }
+
+.tick-small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--good);
+  color: var(--surface);
+}
+.tick-small svg { width: 10px; height: 10px; }
+
+.purchase-order-number {
+  margin: 0 0 0.6rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.purchase-lines { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; }
+.purchase-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.purchase-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0.6rem 0 0;
+  font-size: 0.9rem;
+}
+.purchase-total strong { font-size: 1.15rem; letter-spacing: -0.02em; }
+
+.purchase-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.85rem 0 0.6rem; }
+.purchase-card .muted.small { margin: 0; }
+
 .insight { margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); font-size: 0.82rem; }
 .insight-sources { margin: 0; color: var(--muted); }
 .insight-warning {
@@ -343,6 +466,16 @@ input[aria-invalid='true'] { border-color: var(--bad); }
   border-radius: 6px;
   color: var(--warn-text);
 }
+
+.quick-replies {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+.chip.primary { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
 .composer { display: flex; gap: 0.5rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
 .composer input { flex: 1; }
@@ -394,10 +527,147 @@ input[aria-invalid='true'] { border-color: var(--bad); }
 }
 .timeline-status { font-weight: 600; }
 
+@media (max-width: 860px) {
+  .chat-layout { grid-template-columns: 1fr; }
+  .history-toggle { display: inline-block; justify-self: start; }
+  .chat-history { display: none; max-height: 40vh; }
+  .chat-history.open { display: flex; }
+}
+
 @media (max-width: 720px) {
   .orders-layout { grid-template-columns: 1fr; }
   .bubble { max-width: 92%; }
   .topbar { flex-wrap: wrap; gap: 0.75rem 1rem; }
+}
+
+/* --- cart and checkout ---------------------------------------------------- */
+
+.cart-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.cart-button svg { width: 19px; height: 19px; }
+.cart-button:hover { color: var(--text); background: var(--bg); }
+.cart-button.active { color: var(--accent); }
+
+.cart-badge {
+  position: absolute;
+  top: -1px; right: -3px;
+  min-width: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+}
+
+/* Stacked rather than side by side: the cards are narrow enough that "Add to
+   cart" wraps onto two lines beside a second button, leaving the pair ragged. */
+.product-actions { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.7rem; }
+.button.block { display: block; width: 100%; margin: 0; text-align: center; white-space: nowrap; }
+.in-cart { margin: 0.4rem 0 0; color: var(--accent); font-weight: 600; }
+
+.cart-lines { list-style: none; margin: 1.25rem 0 0; padding: 0; }
+.cart-line {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.cart-line img, .cart-thumb-empty {
+  width: 72px; height: 72px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.cart-line-body { flex: 1; min-width: 0; }
+.cart-line-name { font-size: 0.95rem; margin: 0.15rem 0 0.3rem; }
+.cart-line-actions { display: flex; align-items: center; gap: 1rem; flex: 0 0 auto; }
+.cart-line-total { margin: 0; font-weight: 700; min-width: 5rem; text-align: right; }
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.stepper button {
+  width: 30px; height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.stepper button:hover:not(:disabled) { color: var(--accent); }
+.stepper button:disabled { opacity: 0.4; cursor: not-allowed; }
+.stepper span { min-width: 1.6rem; text-align: center; font-weight: 600; font-size: 0.9rem; }
+
+.cart-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+}
+.cart-summary p { margin: 0; }
+.cart-total { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin: 0.1rem 0 0.3rem !important; }
+.cart-summary-actions { display: flex; align-items: center; gap: 1rem; }
+
+.draft-lines { list-style: none; margin: 1.25rem 0 0; padding: 0; }
+.draft-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.draft-line-name { min-width: 0; }
+.draft-line-total { font-weight: 600; white-space: nowrap; }
+
+.draft-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 1rem 0 0.75rem;
+  font-size: 1.1rem;
+}
+.draft-total strong { font-size: 1.4rem; letter-spacing: -0.02em; }
+
+.order-placed { text-align: center; }
+.order-placed h1 { margin: 0.75rem 0 0.5rem; }
+.order-placed .tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--good);
+  color: var(--surface);
+}
+.order-placed .tick svg { width: 24px; height: 24px; }
+.order-placed .cta-row { margin-top: 1.5rem; }
+
+@media (max-width: 620px) {
+  .cart-line { flex-wrap: wrap; }
+  .cart-line-actions { width: 100%; justify-content: space-between; }
+  .cart-summary { flex-direction: column; align-items: stretch; }
 }
 
 /* --- landing ------------------------------------------------------------- */

@@ -75,6 +75,16 @@ public class OrderDraft {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    /**
+     * The conversation this was proposed in, or null when it came from the
+     * checkout page.
+     *
+     * <p>What stops a purchase agreed to in one thread confirming a draft left
+     * pending in another.
+     */
+    @Column(name = "conversation_ref", length = 36)
+    private String conversationRef;
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "confirmed_order_id")
     private Order confirmedOrder;

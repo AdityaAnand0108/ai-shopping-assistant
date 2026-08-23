@@ -4,6 +4,7 @@ import type {
   ChatResponse,
   ConversationDetail,
   ConversationSummary,
+  Draft,
   OrderDetail,
   OrderSummary,
   Page,
@@ -140,6 +141,28 @@ export const api = {
 
   order: (orderNumber: string) =>
     request<OrderDetail>(`/api/orders/${encodeURIComponent(orderNumber)}`),
+
+  /**
+   * Prices a basket. Creates no order and charges nothing.
+   *
+   * Deliberately sends only SKUs and quantities. The server prices it, and the
+   * response is what the shopper is shown before confirming — a checkout that
+   * posted its own totals would be one edited request away from a free order.
+   */
+  createDraft: (items: { sku: string; quantity: number }[]) =>
+    request<Draft>('/api/purchases/draft', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
+
+  /** The only call that places an order. */
+  confirmDraft: (reference: string) =>
+    request<OrderDetail>(`/api/purchases/${encodeURIComponent(reference)}/confirm`, {
+      method: 'POST',
+    }),
+
+  cancelDraft: (reference: string) =>
+    request<void>(`/api/purchases/${encodeURIComponent(reference)}`, { method: 'DELETE' }),
 
   chat: (message: string, conversationId?: string) =>
     request<ChatResponse>('/api/chat', {

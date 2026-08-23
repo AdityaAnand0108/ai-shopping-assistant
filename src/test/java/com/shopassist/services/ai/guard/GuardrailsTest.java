@@ -327,6 +327,35 @@ class GuardrailsTest {
     }
 
     @Test
+    void flagsAFabricatedCatalogueWhenNoToolRanAtAll() {
+        // Observed in use. Asked for shoes, the model answered "based on popular
+        // choices" with three products, three SKUs and three prices, having
+        // called nothing. This used to be reported as grounded, because a turn
+        // with no tool call was excused — which excused the one case where every
+        // figure in the reply is invented.
+        var result = grounding.check("""
+                Based on popular choices, here are a few options for shoes:
+                1. Nike Air Max 270 - SKU: SNY-AM-001, Price: $129.99
+                2. Adidas Ultraboost - SKU: SNY-UB-001, Price: $159.99""",
+                Set.of(), Set.of(), false);
+
+        assertThat(result.grounded()).isFalse();
+        assertThat(result.unsupported())
+                .contains("SNY-AM-001", "SNY-UB-001", "$129.99", "$159.99");
+    }
+
+    @Test
+    void stillDoesNotFlagAToollessReplyThatClaimsNothing() {
+        // The case the old escape was written for, which needs no escape: a
+        // reply with no identifiers and no prices has nothing to be unsupported.
+        var result = grounding.check(
+                "I can help you find products, check an order, or place one.",
+                Set.of(), Set.of(), false);
+
+        assertThat(result.grounded()).isTrue();
+    }
+
+    @Test
     void groundingIsDisabledByConfiguration() {
         GroundingCheck off = new GroundingCheck(new GuardProperties(true, true, false, 20));
         var result = off.check("Totally invented: $9,999 for FAKE-SKU-001",

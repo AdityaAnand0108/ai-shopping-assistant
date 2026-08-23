@@ -63,7 +63,7 @@ public class PurchaseTools {
 
         OrderDraft draft;
         try {
-            draft = purchaseService.createDraft(parseItems(items));
+            draft = purchaseService.createDraft(parseItems(items), recorder.conversationRef());
         } catch (ResourceNotFoundException e) {
             // Small models routinely mistype a SKU they are recalling from an
             // earlier turn. Spring AI hands this message back to the model, so
@@ -76,6 +76,7 @@ public class PurchaseTools {
                     + " then call createOrderDraft with the SKU exactly as it was returned.");
         }
 
+        recorder.noteDraft(draft.getPublicRef());
         return recorder.recorded("createOrderDraft", new DraftSummary(
                 draft.getPublicRef(),
                 draft.getItems().stream()
@@ -100,6 +101,11 @@ public class PurchaseTools {
      *
      * <p>Like {@code listMyOrders}, the absence of an argument is the point —
      * there is nothing here for the model to get wrong.
+     *
+     * <p>The conversation comes from the turn rather than from the model, and it
+     * matters: without it this confirmed the shopper's newest draft anywhere,
+     * so a purchase left pending in one thread could be bought by agreeing to a
+     * different one in another.
      */
     @Tool(name = "confirmOrder", description = """
             Place the purchase you most recently priced with createOrderDraft. \
@@ -111,8 +117,9 @@ public class PurchaseTools {
             cancelling the resulting order.""")
     public PlacedOrder confirmOrder() {
         log.info("Tool confirmOrder()");
-        var order = purchaseService.confirmLatestDraft();
+        var order = purchaseService.confirmLatestDraftIn(recorder.conversationRef());
 
+        recorder.noteOrder(order.getOrderNumber());
         return recorder.recorded("confirmOrder", new PlacedOrder(
                 order.getOrderNumber(), order.getStatus(),
                 order.getTotalAmount(), order.getExpectedDeliveryDate(),
