@@ -36,7 +36,27 @@ import java.util.regex.Pattern;
 @Slf4j
 public class GroundingCheck {
 
-    private static final Pattern SKU = Pattern.compile("\\b[A-Z]{2,4}-(?:[A-Z]{2}-)?\\d{3,4}\\b");
+    /**
+     * A product SKU: uppercase groups joined by hyphens, ending in three digits.
+     *
+     * <p>Anchored at both ends, which matters more than it looks. A looser
+     * pattern matched <em>inside</em> other tokens: it read {@code ORD-2026} out
+     * of a perfectly valid order number and reported it as unsupported, so any
+     * reply naming a real order was flagged ungrounded. A check that cries wolf
+     * gets switched off, which would have cost more than the bug itself.
+     *
+     * <p>The lookbehind stops a match starting mid-token, the lookahead stops it
+     * ending where more digits or another hyphen follow, and the groups allow
+     * two to four characters so a hallucinated SKU like {@code DLP-INS-002} is
+     * caught whole rather than as the fragment {@code INS-002}.
+     *
+     * <p>Exactly three trailing digits, because every SKU in the catalog has
+     * three and requiring four as well matched ordinary text like
+     * {@code AI-2024}.
+     */
+    private static final Pattern SKU = Pattern.compile(
+            "(?<![A-Z0-9-])[A-Z]{2,4}(?:-[A-Z]{2,4})*-\\d{3}(?![\\d-])");
+
     private static final Pattern ORDER_NUMBER = Pattern.compile("\\bORD-\\d{4}-\\d{6}\\b");
 
     /**

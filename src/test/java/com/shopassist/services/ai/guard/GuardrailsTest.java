@@ -202,6 +202,50 @@ class GuardrailsTest {
     }
 
     @Test
+    void doesNotFlagALegitimateOrderNumberAsAnUnknownSku() {
+        // Regression. The SKU pattern used to match ORD-2026 inside a valid order
+        // number, so every reply naming a real order was reported ungrounded.
+        // A check that cries wolf is a check that gets switched off.
+        var result = grounding.check("Your order ORD-2026-000102 is out for delivery.",
+                Set.of("ORD-2026-000102"), Set.of(), true);
+
+        assertThat(result.grounded()).isTrue();
+        assertThat(result.unsupported()).isEmpty();
+    }
+
+    @Test
+    void catchesAHallucinatedSkuWholeRatherThanAsAFragment() {
+        // Observed live: asked for a Dell laptop the model invented DLP-INS-002
+        // and presented it as a search result. The real SKU is DEL-LP-001. An
+        // earlier pattern reported only the fragment "INS-002", which told a
+        // shopper nothing.
+        var result = grounding.check(
+                "1. Dell Inspiron 15 Laptop - SKU: DLP-INS-002 - Price: $699.99",
+                Set.of("DEL-LP-001"), Set.of("699.99"), true);
+
+        assertThat(result.grounded()).isFalse();
+        assertThat(result.unsupported()).containsExactly("DLP-INS-002");
+    }
+
+    @Test
+    void acceptsEverySkuShapeTheCatalogActuallyUses() {
+        var result = grounding.check(
+                "We have DEL-LP-001, NIK-TS-001, ANK-HP-002 and BK-001 in stock.",
+                Set.of("DEL-LP-001", "NIK-TS-001", "ANK-HP-002", "BK-001"), Set.of(), true);
+
+        assertThat(result.grounded()).isTrue();
+    }
+
+    @Test
+    void ignoresHyphenatedWordsThatAreNotSkus() {
+        var result = grounding.check(
+                "It has USB-C charging and was reviewed in AI-2024 coverage.",
+                Set.of(), Set.of(), true);
+
+        assertThat(result.grounded()).isTrue();
+    }
+
+    @Test
     void catchesADateNoToolReturned() {
         // Observed live: a cancelled order placed in August was reported as
         // "placed on 2026-02-21".

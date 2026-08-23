@@ -33,8 +33,15 @@ import java.util.regex.Pattern;
 @Slf4j
 public class ToolCallRecorder {
 
-    /** Product SKUs, e.g. NIK-TS-001 or BK-001. */
-    private static final Pattern SKU = Pattern.compile("\\b[A-Z]{2,4}-(?:[A-Z]{2}-)?\\d{3,4}\\b");
+    /**
+     * Product SKUs, e.g. NIK-TS-001 or BK-001.
+     *
+     * <p>Must stay identical to the pattern in {@code GroundingCheck}: this side
+     * decides what counts as supported and that side decides what was claimed,
+     * so a SKU either pattern missed would be judged against the wrong evidence.
+     */
+    private static final Pattern SKU = Pattern.compile(
+            "(?<![A-Z0-9-])[A-Z]{2,4}(?:-[A-Z]{2,4})*-\\d{3}(?![\\d-])");
 
     /** Order numbers, e.g. ORD-2026-000102. */
     private static final Pattern ORDER_NUMBER = Pattern.compile("\\bORD-\\d{4}-\\d{6}\\b");
