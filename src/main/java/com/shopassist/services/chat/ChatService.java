@@ -88,6 +88,7 @@ public class ChatService {
 
         AssistantReply reply;
         List<String> toolsUsed;
+        java.util.Set<String> toolFacts;
         GroundingCheck.Result grounding;
         try {
             toolCallRecorder.startTurn();
@@ -95,6 +96,7 @@ public class ChatService {
                     SystemPrompts.WITH_TOOLS, turn.history(), question));
 
             toolsUsed = toolCallRecorder.toolsUsed();
+            toolFacts = toolCallRecorder.identifiers();
             grounding = groundingCheck.check(reply.content(),
                     toolCallRecorder.identifiers(),
                     toolCallRecorder.amounts(),
@@ -106,11 +108,14 @@ public class ChatService {
             toolCallRecorder.clear();
         }
 
-        String finalContent = outputGuard.inspect(reply.content()).orElse(reply.content());
-        boolean redacted = !finalContent.equals(reply.content());
+        // Strip first, then inspect: the note is an artefact this application
+        // injected, so removing it should not count as redacting the answer.
+        String cleaned = outputGuard.stripInternalNotes(reply.content());
+        String finalContent = outputGuard.inspect(cleaned).orElse(cleaned);
+        boolean redacted = !finalContent.equals(cleaned);
 
         ChatMessage answer = store.recordReply(turn.conversationRef(),
-                new AssistantReply(finalContent, reply.model(), reply.latencyMs()));
+                new AssistantReply(finalContent, reply.model(), reply.latencyMs()), toolFacts);
 
         return new ChatResponse(turn.conversationRef(), ChatMessageResponse.from(answer),
                 new TurnInsight(toolsUsed, grounding.grounded(), grounding.unsupported(), redacted));
@@ -126,7 +131,8 @@ public class ChatService {
 
         ConversationStore.PreparedTurn turn = store.startTurn(request.conversationId(), question);
         ChatMessage answer = store.recordReply(turn.conversationRef(),
-                new AssistantReply(refusal.reply(), "guardrail:" + refusal.category(), 0L));
+                new AssistantReply(refusal.reply(), "guardrail:" + refusal.category(), 0L),
+                java.util.Set.of());
 
         return new ChatResponse(turn.conversationRef(), ChatMessageResponse.from(answer),
                 TurnInsight.refused());

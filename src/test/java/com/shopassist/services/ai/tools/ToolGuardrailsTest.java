@@ -229,7 +229,7 @@ class ToolGuardrailsTest {
         signIn("demo");
         var draft = purchaseTools.createOrderDraft("NIK-TS-001:2, BK-001:1");
 
-        var placed = purchaseTools.confirmOrder(draft.draftReference());
+        var placed = purchaseTools.confirmOrder();
 
         assertThat(placed.orderNumber()).startsWith("ORD-");
         assertThat(placed.status()).isEqualTo(OrderStatus.PLACED);
@@ -241,10 +241,11 @@ class ToolGuardrailsTest {
     void aFabricatedConfirmationReferenceBuysNothing() {
         signIn("demo");
 
-        // A model that skips createOrderDraft and invents a reference cannot
-        // reach an order this way.
-        assertThatThrownBy(() -> purchaseTools.confirmOrder("not-a-real-draft"))
-                .isInstanceOf(ResourceNotFoundException.class);
+        // A model that skips createOrderDraft entirely has nothing to confirm.
+        // It can no longer invent a reference, because there is no argument.
+        assertThatThrownBy(() -> purchaseTools.confirmOrder())
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("nothing to confirm");
         assertThat(orderTools.listMyOrders()).isEmpty();
     }
 
@@ -253,9 +254,41 @@ class ToolGuardrailsTest {
         signIn("demo");
         var draft = purchaseTools.createOrderDraft("BK-001:1");
 
+        // Rahul has no draft of his own, so there is nothing for him to confirm -
+        // and no way to name somebody else's.
         signIn("rahul");
-        assertThatThrownBy(() -> purchaseTools.confirmOrder(draft.draftReference()))
-                .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> purchaseTools.confirmOrder())
+                .isInstanceOf(InvalidRequestException.class);
+    }
+
+    @Test
+    void confirmsWithoutTheModelCarryingAReferenceAcrossTurns() {
+        // The failure this replaced. Conversation history replays only the text
+        // of earlier turns, so a draft reference handed to the model in one turn
+        // is gone by the next. Confirming has to work with nothing carried over.
+        signIn("demo");
+        purchaseTools.createOrderDraft("DEL-LP-001:1");
+
+        var placed = purchaseTools.confirmOrder();
+
+        assertThat(placed.orderNumber()).startsWith("ORD-");
+        assertThat(placed.total()).isEqualByComparingTo("699.99");
+        assertThat(orderTools.listMyOrders()).hasSize(1);
+    }
+
+    @Test
+    void confirmsTheMostRecentDraftWhenTheModelRepricedFirst() {
+        // Observed live: told "yes, place the order", the model priced the
+        // purchase a second time instead of confirming. The newest draft is the
+        // one the shopper just agreed to.
+        signIn("demo");
+        purchaseTools.createOrderDraft("BK-001:1");
+        purchaseTools.createOrderDraft("DEL-LP-001:1");
+
+        var placed = purchaseTools.confirmOrder();
+
+        assertThat(placed.total()).isEqualByComparingTo("699.99");
+        assertThat(orderTools.listMyOrders()).hasSize(1);
     }
 
     @Test
@@ -263,8 +296,8 @@ class ToolGuardrailsTest {
         signIn("demo");
         var draft = purchaseTools.createOrderDraft("BK-001:1");
 
-        var first = purchaseTools.confirmOrder(draft.draftReference());
-        var second = purchaseTools.confirmOrder(draft.draftReference());
+        var first = purchaseTools.confirmOrder();
+        var second = purchaseTools.confirmOrder();
 
         // A model that repeats a tool call must not create a second order.
         assertThat(second.orderNumber()).isEqualTo(first.orderNumber());
@@ -276,8 +309,8 @@ class ToolGuardrailsTest {
         signIn("demo");
         assertThat(catalogTools.checkStock("APL-LP-001", 4).available()).isTrue();
 
-        purchaseTools.confirmOrder(
-                purchaseTools.createOrderDraft("APL-LP-001:4").draftReference());
+        purchaseTools.createOrderDraft("APL-LP-001:4");
+        purchaseTools.confirmOrder();
 
         // Four were in stock and four were bought.
         assertThat(catalogTools.checkStock("APL-LP-001", 1).available()).isFalse();
@@ -299,7 +332,7 @@ class ToolGuardrailsTest {
 
         expire(draft.draftReference());
 
-        assertThatThrownBy(() -> purchaseTools.confirmOrder(draft.draftReference()))
+        assertThatThrownBy(() -> purchaseTools.confirmOrder())
                 .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("expired");
         assertThat(orderTools.listMyOrders()).isEmpty();

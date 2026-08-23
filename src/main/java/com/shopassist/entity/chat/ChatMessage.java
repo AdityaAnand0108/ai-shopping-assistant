@@ -66,6 +66,17 @@ public class ChatMessage {
     @Column(name = "latency_ms")
     private Integer latencyMs;
 
+    /**
+     * Identifiers this turn's tools returned, comma separated.
+     *
+     * <p>Replayed alongside the message so the next turn can act on a SKU or an
+     * order number the model was shown but did not repeat in its prose. Without
+     * this the model has to recall an identifier from memory, and it gets that
+     * wrong often enough to break the purchase flow entirely.
+     */
+    @Column(name = "tool_facts", length = 500)
+    private String toolFacts;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -84,12 +95,14 @@ public class ChatMessage {
                 .build();
     }
 
-    public static ChatMessage fromAssistant(String content, String model, long latencyMs) {
+    public static ChatMessage fromAssistant(String content, String model, long latencyMs,
+                                            String toolFacts) {
         return ChatMessage.builder()
                 .role(MessageRole.ASSISTANT)
                 .content(content)
                 .model(model)
                 .latencyMs((int) Math.min(latencyMs, Integer.MAX_VALUE))
+                .toolFacts(toolFacts)
                 .build();
     }
 }

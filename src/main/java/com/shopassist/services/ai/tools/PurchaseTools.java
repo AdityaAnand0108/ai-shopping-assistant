@@ -89,18 +89,29 @@ public class PurchaseTools {
                         + "them to confirm, then call confirmOrder with this reference."));
     }
 
+    /**
+     * Places the purchase most recently priced for this shopper.
+     *
+     * <p>Deliberately takes no arguments. It used to take the reference returned
+     * by {@code createOrderDraft}, which could not work: conversation history
+     * replays only the text of earlier turns, so that reference is gone by the
+     * time the shopper says yes. The model was left either inventing one or
+     * re-pricing the purchase forever.
+     *
+     * <p>Like {@code listMyOrders}, the absence of an argument is the point —
+     * there is nothing here for the model to get wrong.
+     */
     @Tool(name = "confirmOrder", description = """
-            Place a purchase that the shopper has explicitly agreed to. Only call \
-            this after createOrderDraft, after telling them the total, and after \
-            they clearly said yes. Never call it in the same reply that first \
-            proposed the purchase. This charges the shopper and cannot be undone \
-            except by cancelling the resulting order.""")
-    public PlacedOrder confirmOrder(
-            @ToolParam(description = "The reference returned by createOrderDraft")
-            String draftReference) {
-
-        log.info("Tool confirmOrder(draftReference={})", draftReference);
-        var order = purchaseService.confirmDraft(draftReference);
+            Place the purchase you most recently priced with createOrderDraft. \
+            Takes no arguments: the store already knows which purchase is \
+            waiting, so you never need a reference and must not ask the shopper \
+            for one. Call this as soon as they agree to the total, and do not \
+            price the purchase again first. Only call it after they have clearly \
+            said yes. This charges the shopper and cannot be undone except by \
+            cancelling the resulting order.""")
+    public PlacedOrder confirmOrder() {
+        log.info("Tool confirmOrder()");
+        var order = purchaseService.confirmLatestDraft();
 
         return recorder.recorded("confirmOrder", new PlacedOrder(
                 order.getOrderNumber(), order.getStatus(),

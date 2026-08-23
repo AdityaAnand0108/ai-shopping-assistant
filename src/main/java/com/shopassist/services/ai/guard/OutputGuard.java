@@ -54,6 +54,18 @@ public class OutputGuard {
     /** A BCrypt hash, however it got there. */
     private static final Pattern BCRYPT = Pattern.compile("\\$2[aby]?\\$\\d{2}\\$[./A-Za-z0-9]{20,}");
 
+    /**
+     * A UUID.
+     *
+     * <p>Every internal reference in this system is one - draft references,
+     * conversation ids, the public key of an account. None of them has any
+     * business in a sentence shown to a shopper, so one surviving the note strip
+     * is a genuine leak rather than a stray artefact.
+     */
+    private static final Pattern INTERNAL_ID = Pattern.compile(
+            "\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b",
+            Pattern.CASE_INSENSITIVE);
+
     /** A JWT. */
     private static final Pattern JWT = Pattern.compile("\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}");
 
@@ -65,6 +77,41 @@ public class OutputGuard {
 
     public OutputGuard(GuardProperties properties) {
         this.properties = properties;
+    }
+
+    /**
+     * The internal note appended to earlier turns so the model can reuse the
+     * identifiers its tools returned.
+     *
+     * <p>The model is told never to repeat these, and it does anyway — observed
+     * echoing one, complete with a draft's internal reference, straight to a
+     * shopper. It had seen the format in its own history and imitated it. An
+     * instruction is not a mechanism, which is the recurring lesson of this
+     * project; stripping the line is.
+     */
+    private static final Pattern INTERNAL_NOTE = Pattern.compile(
+            "(?m)^\\s*\\[[^\\]]*(?:data returned by your tools|draftReference|searchProducts"
+                    + "|getProductDetails|checkStock|listMyOrders|getOrderStatus"
+                    + "|getDeliveryEstimate|createOrderDraft|confirmOrder|cancelOrder)"
+                    + "[^\\]]*\\]\\s*$");
+
+    /**
+     * Removes internal notes the model copied out of its own context.
+     *
+     * <p>Stripped rather than replacing the whole reply, unlike a real leak. The
+     * note is a self-contained artefact this application injected, so removing
+     * the line leaves a perfectly good answer behind — whereas cutting a table
+     * name out of a sentence leaves the sentence, which usually says as much.
+     */
+    public String stripInternalNotes(String reply) {
+        if (reply == null) {
+            return null;
+        }
+        String cleaned = INTERNAL_NOTE.matcher(reply).replaceAll("").strip();
+        if (!cleaned.equals(reply.strip())) {
+            log.info("Stripped an internal note the model repeated back");
+        }
+        return cleaned;
     }
 
     /**
@@ -103,6 +150,9 @@ public class OutputGuard {
         }
         if (BCRYPT.matcher(reply).find()) {
             return "password hash";
+        }
+        if (INTERNAL_ID.matcher(reply).find()) {
+            return "internal reference";
         }
         if (JWT.matcher(reply).find()) {
             return "token";

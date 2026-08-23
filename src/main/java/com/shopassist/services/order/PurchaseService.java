@@ -119,11 +119,41 @@ public class PurchaseService {
     }
 
     /**
-     * Turns a confirmed draft into a real order.
+     * Confirms the shopper's most recent proposed purchase.
      *
-     * <p>Re-reads prices and stock rather than trusting what the draft recorded.
-     * A draft is a quote, and a quote taken minutes ago is not a promise the shop
-     * can still keep.
+     * <p>This is what the assistant calls, and it takes no reference at all.
+     *
+     * <p>It used to take one, and that was a design mistake serious enough to
+     * break the purchase flow entirely. Conversation history replays only the
+     * text of previous turns, so a reference the model received from a tool in
+     * one turn is gone by the next. Asked to confirm, the model had nothing to
+     * pass — so it either invented a reference or simply drafted the purchase
+     * again, and a shopper saying "yes, place the order" could loop forever
+     * without ever buying anything.
+     *
+     * <p>Resolving the draft server-side removes the whole class of failure, and
+     * it follows the same principle as {@code listMyOrders}: the model should
+     * never have to carry an identifier it can get wrong. The two-step guarantee
+     * is untouched — a draft must still have been built in an earlier call, so
+     * no single call both decides on a purchase and completes it.
+     */
+    @Transactional
+    public Order confirmLatestDraft() {
+        OrderDraft draft = draftRepository
+                .findFirstByUserIdOrderByIdDesc(currentUserService.requireUserId())
+                .orElseThrow(() -> new InvalidRequestException(
+                        "There is nothing to confirm yet. Build the purchase first, "
+                                + "tell the shopper the total, and then confirm it."));
+
+        return confirm(draft);
+    }
+
+    /**
+     * Confirms one specific draft by reference.
+     *
+     * <p>Not reachable from the assistant, which uses {@link #confirmLatestDraft()}.
+     * Kept for a UI that shows a drafted purchase and lets the shopper click it,
+     * where the reference is carried by the page rather than recalled by a model.
      */
     @Transactional
     public Order confirmDraft(String draftRef) {
@@ -132,10 +162,22 @@ public class PurchaseService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No pending purchase found with reference " + draftRef));
 
+        return confirm(draft);
+    }
+
+    /**
+     * Turns a draft into a real order.
+     *
+     * <p>Re-reads prices and stock rather than trusting what the draft recorded.
+     * A draft is a quote, and a quote taken minutes ago is not a promise the shop
+     * can still keep.
+     */
+    private Order confirm(OrderDraft draft) {
         if (draft.getStatus() == DraftStatus.CONFIRMED) {
             // Re-confirming is a no-op, not a second order. A model that repeats
             // a tool call must not be able to charge twice.
-            log.info("Draft {} was already confirmed; returning the existing order", draftRef);
+            log.info("Draft {} was already confirmed; returning the existing order",
+                    draft.getPublicRef());
             return draft.getConfirmedOrder();
         }
         if (draft.getStatus() == DraftStatus.CANCELLED) {
@@ -196,7 +238,7 @@ public class PurchaseService {
         draftRepository.save(draft);
 
         log.info("Confirmed draft {} as order {} totalling {}",
-                draftRef, placed.getOrderNumber(), total);
+                draft.getPublicRef(), placed.getOrderNumber(), total);
         return placed;
     }
 

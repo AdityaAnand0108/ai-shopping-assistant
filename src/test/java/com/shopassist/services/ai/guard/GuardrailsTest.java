@@ -127,6 +127,50 @@ class GuardrailsTest {
     }
 
     @Test
+    void stripsAnInternalNoteTheModelCopiedIntoItsReply() {
+        // Observed live. The note is appended to earlier turns so the model can
+        // reuse a SKU it was given; told not to repeat it, the model repeated it
+        // anyway - with a draft's internal reference in it.
+        String leaked = """
+                The total for your order is $699.99. Please confirm.
+                [data returned by your tools that turn: ef89c65a-bb16-4ec3-b2c1-f1e5534f3c23]""";
+
+        String cleaned = outputGuard.stripInternalNotes(leaked);
+
+        assertThat(cleaned)
+                .isEqualTo("The total for your order is $699.99. Please confirm.")
+                .doesNotContain("data returned by your tools")
+                .doesNotContain("ef89c65a");
+    }
+
+    @Test
+    void stripsANoteEvenWhenTheModelInventedItsOwnFormat() {
+        // Observed live after the first fix. Told not to repeat the bracketed
+        // note, the model wrote its own bracketed narration instead. It had
+        // learned the habit from the format, not the wording.
+        String leaked = """
+                The total is $699.99. Please confirm.
+                [createOrderDraft called with items: DEL-LP-001:1, draftReference:                 b701077d-cc7e-4ba7-8ccd-56594181cab5, total: $699.99]""";
+
+        assertThat(outputGuard.stripInternalNotes(leaked))
+                .isEqualTo("The total is $699.99. Please confirm.");
+    }
+
+    @Test
+    void treatsAnInternalReferenceThatSurvivesAsALeak() {
+        // A UUID outside a bracketed note has no innocent reading: every
+        // internal reference in this system is one.
+        assertThat(outputGuard.inspect(
+                "Your reference is b701077d-cc7e-4ba7-8ccd-56594181cab5")).isPresent();
+    }
+
+    @Test
+    void leavesAReplyWithoutANoteExactlyAsItWas() {
+        String reply = "Your order ORD-2026-000102 is out for delivery.";
+        assertThat(outputGuard.stripInternalNotes(reply)).isEqualTo(reply);
+    }
+
+    @Test
     void leavesAnOrdinaryReplyAlone() {
         String[] fine = {
                 "We have four Nike t-shirts, from $29.99 to $49.99.",
